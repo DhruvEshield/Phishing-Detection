@@ -1,0 +1,27 @@
+# --- ML data & artifacts ---
+# Raw corpus emails are large (8,614 .eml ≈ 420 MB). Kept on disk for training/fixtures,
+# but NOT committed to git. Provenance + how to re-fetch is in ml/data/README.md.
+ml/data/phishing_pot/email/
+ml/models/
+ml/reports/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Node / frontend ---
+node_modules/
+.next/
+dist/
+build/
+.env.local
+
+# --- OS / editor ---
+.DS_Store

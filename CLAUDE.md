@@ -1,5 +1,7 @@
 # CLAUDE.md — Project Router
 
+**Version:** v0.1.0 · Phase 1 (pre-build) · 2026-06-25
+
 This is a **light router**, not a manual. It tells you *which* context to load for the work in
 front of you. Detailed context lives in modular files under [.claude/context/](.claude/context/) —
 load only what's relevant so context stays focused. The authoritative product vision is
@@ -24,12 +26,19 @@ layers*, not a replacement for Defender/Proofpoint/Abnormal.
 |---|---|---|
 | The detection pipeline, scoring, routing, **how the layers connect** | [architecture.md](.claude/context/architecture.md) | — |
 | `services/` — Python API, email parsing, scoring engine | [backend.md](.claude/context/backend.md) | `backend-patterns`, `api-design`, `database-migrations`, `security-review`, `tdd-workflow` |
-| `frontend/` — analyst dashboard (Next.js/TS) | [frontend.md](.claude/context/frontend.md) | `frontend-patterns`, `tdd-workflow` |
+| `frontend/` — analyst dashboard (React/Vite/TS) | [frontend.md](.claude/context/frontend.md) | `frontend-patterns`, `tdd-workflow` |
 | `ml/` — models, training, retraining | [ml.md](.claude/context/ml.md) | `tdd-workflow` |
 | `infra/` — Docker, PostgreSQL, queue, deploy, monitoring | [infra.md](.claude/context/infra.md) | `docker-patterns`, `deployment-patterns`, `database-migrations` |
+| **Connecting to PhishSkill** (corpus, domain-intel, shapes, UI) | [phishskill-integration.md](.claude/context/phishskill-integration.md) | — |
 | Deciding **what to build next** / is this in-phase? | [roadmap.md](.claude/context/roadmap.md) | — |
 | Any non-trivial change (the non-negotiables) | [principles.md](.claude/context/principles.md) | `security-review` |
 | Investigating threats / techniques / market | [original plan.md](original%20plan.md) | `deep-research` |
+
+> **PhishSkill:** this tool is standalone (build & test it on its own, no PhishSkill access
+> needed) but is designed to connect to **PhishSkill** later — that's the maintainer's step, not a
+> rebuild. One lean file covers the conventions that keep it integration-ready:
+> [phishskill-integration.md](.claude/context/phishskill-integration.md). The corpus is vendored at
+> [ml/data/](ml/data/).
 
 ## Five rules that always apply
 
@@ -48,17 +57,21 @@ Full detail behind each: [principles.md](.claude/context/principles.md).
 main/
 ├── CLAUDE.md              # This router
 ├── original plan.md       # Authoritative product vision (the "why")
+├── implementation_plan.md # Phase 1 build plan (concrete files + invariants)
+├── .gitignore             # excludes the large raw corpus + build artifacts
+├── ml/data/               # vendored detection corpus (phishing_pot — see ml/data/README.md)
 ├── .claude/
 │   └── context/           # Modular context — load per task (see table above)
-│       ├── architecture.md   # Two layers + the feedback loop
-│       ├── backend.md        # services/ — Python detection pipeline
-│       ├── frontend.md       # frontend/ — analyst dashboard
-│       ├── ml.md             # ml/ — the 4 models + drift/retraining governance
-│       ├── infra.md          # infra/ — Docker, DB, queue, deploy, monitoring
-│       ├── roadmap.md        # the 3 phases (currently Phase 1)
-│       └── principles.md     # 9 engineering principles + working agreement
+│       ├── architecture.md          # Two layers + the feedback loop
+│       ├── backend.md               # services/ — Python detection pipeline
+│       ├── frontend.md              # frontend/ — analyst dashboard
+│       ├── ml.md                    # ml/ — the 4 models + drift/retraining governance
+│       ├── infra.md                 # infra/ — Docker, DB, queue, deploy, monitoring
+│       ├── phishskill-integration.md # how to keep it integration-ready for PhishSkill (lean)
+│       ├── roadmap.md               # the 3 phases (currently Phase 1)
+│       └── principles.md            # 9 engineering principles + working agreement
 └── (to be created)
-    ├── services/   ├── frontend/   ├── ml/   └── infra/
+    ├── services/   ├── frontend/   ├── ml/{train,inference,...}   └── infra/
 ```
 
 > The repo is greenfield — only plans exist today. As code lands in `services/` / `frontend/` /

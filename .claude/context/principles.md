@@ -27,6 +27,24 @@
 9. **Models drift — plan for retraining.** Treat every ML model as a maintained asset with a
    retraining path, not a one-time artifact.
 
+## Engineering conventions
+
+These match our production-MVP bar — adopt them (in Python):
+
+- **Fat Service, Thin Controller.** All business logic lives in service modules; API
+  routes/controllers stay thin (parse request → call service → shape response). No detection or
+  scoring logic in route handlers.
+- **Mandatory structured logging.** Every significant action logs with structured fields
+  (`action`, `resourceId`, and — for syncable records — `tenantId`), and **real failures log at
+  `error`** (never swallowed in an empty `except`). Errors should surface on an ops/health
+  view, not vanish. (Reinforces principle #7 and the production-MVP target in [infra.md](infra.md).)
+- **Audit trail for significant actions.** Persist an audit record (actor, action, resourceId,
+  severity, timestamp) for verdicts and analyst decisions — this *is* the data-capture that
+  principle #5 and the feedback loop depend on.
+- **TDD, 80%+ coverage.** RED → GREEN → REFACTOR; unit + integration. The scoring-invariant test
+  (no single signal breaches the high threshold) is the canonical must-have. Use the
+  `tdd-workflow` skill.
+
 ## Working agreement for AI assistants
 
 - **Read [original plan.md](../../original%20plan.md) for the "why"; read the slim

@@ -15,9 +15,12 @@ a verdict. The analyst's decision feeds back into the corpus and scoring
 This is where [principles.md](principles.md) #2 (human-in-the-loop) and #3 (explainability is a
 feature) become concrete UI: no decision should be a black box to the analyst.
 
-## Stack (intended direction — pin versions in `package.json` as code lands)
+## Stack (aligned to PhishSkill)
 
-- **React + Next.js + TypeScript.** Consumes the backend API ([backend.md](backend.md)).
+- **React + Vite + React Router + TypeScript**, Tailwind + MUI, react-hook-form + zod. Consumes
+  the backend API ([backend.md](backend.md)).
+- Matches PhishSkill so the two dashboards feel like one product (not Next.js — it's an auth-gated
+  SPA, no SSR/SEO need). Before building UI, read [phishskill-integration.md](phishskill-integration.md) §3.
 
 ## Conventions
 
