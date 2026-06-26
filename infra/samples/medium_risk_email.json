@@ -1,0 +1,20 @@
+{
+  "headers": {
+    "From": "\"IT Support\" <support@micros0ft-helpdesk.com>",
+    "To": "employee@company.com",
+    "Subject": "URGENT: Your account will be suspended in 24 hours",
+    "Reply-To": "attacker@gmail.com",
+    "Received": "from micros0ft-helpdesk.com (unknown [185.220.101.45]) by mail.company.com",
+    "DKIM-Signature": "",
+    "Message-ID": "<abc123@micros0ft-helpdesk.com>",
+    "Date": "Wed, 25 Jun 2026 08:00:00 +0000"
+  },
+  "body_text": "Dear Employee,\n\nYour Microsoft 365 account will be suspended within 24 hours due to a security violation. You must verify your credentials IMMEDIATELY to avoid losing access.\n\nClick here to verify now: http://login-microsoftonline-secure.xyz/verify?user=employee@company.com\n\nThis is an automated message from Microsoft IT Security. Failure to act will result in permanent account suspension.\n\nMicrosoft Support Team",
+  "body_html": "<html><body><p>Dear Employee,</p><p>Your Microsoft 365 account will be suspended within <strong>24 hours</strong> due to a security violation. <a href='http://login-microsoftonline-secure.xyz/verify?user=employee@company.com'>Click here to verify now</a>.</p></body></html>",
+  "attachments": [],
+  "raw_mime": null,
+  "metadata": {
+    "source": "test-fixture",
+    "tenant_id": null
+  }
+}

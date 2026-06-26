@@ -1,0 +1,6 @@
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #F8FAFC;
+}
+* { box-sizing: border-box; }

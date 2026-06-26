@@ -1,0 +1,28 @@
+# Dev requirements — skips native libs that need system packages on Windows.
+# Use the full requirements.txt inside Docker (which has libzbar0).
+fastapi==0.111.1
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+pydantic==2.7.4
+pydantic-settings==2.3.3
+sqlalchemy==2.0.31
+alembic==1.13.2
+psycopg2-binary==2.9.9
+redis==5.0.7
+rq==1.16.2
+dnspython==2.6.1
+tldextract==5.1.2
+httpx==0.27.0
+Levenshtein==0.25.1
+Pillow==10.4.0
+scikit-learn==1.5.1
+joblib==1.4.2
+structlog==24.2.0
+python-dateutil==2.9.0
+# Testing
+pytest==8.2.2
+pytest-cov==5.0.0
+# Note: pyzbar (QR decoding) requires libzbar0 - works in Docker.
+# On Windows dev, QR detector runs in graceful fallback mode.
+# Note: python-magic requires libmagic - omitted for Windows dev.
+# Note: pyspf / dkimpy - install separately if needed for full header validation.
