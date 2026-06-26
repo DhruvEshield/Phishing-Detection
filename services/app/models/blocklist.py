@@ -7,15 +7,12 @@ from datetime import datetime, timezone
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base, SCHEMA, IS_SQLITE, JsonColumn, UuidColumn
-
-_schema = {} if IS_SQLITE else {"schema": SCHEMA}
-_fk_prefix = "" if IS_SQLITE else f"{SCHEMA}."
+from app.database import Base, SCHEMA, JsonColumn, UuidColumn
 
 
 class BlocklistEntry(Base):
     __tablename__ = "blocklist_entries"
-    __table_args__ = _schema
+    __table_args__ = {"schema": SCHEMA}
 
     id: Mapped[str] = mapped_column(UuidColumn, primary_key=True,
                                     default=lambda: str(uuid.uuid4()))

@@ -7,12 +7,12 @@ from datetime import datetime, timezone
 from sqlalchemy import DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base, SCHEMA, IS_SQLITE, JsonColumn, UuidColumn
+from app.database import Base, SCHEMA, JsonColumn, UuidColumn
 
 
 class Email(Base):
     __tablename__ = "emails"
-    __table_args__ = {} if IS_SQLITE else {"schema": SCHEMA}
+    __table_args__ = {"schema": SCHEMA}
 
     id: Mapped[str] = mapped_column(
         UuidColumn, primary_key=True,

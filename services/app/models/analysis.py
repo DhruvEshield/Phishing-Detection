@@ -7,20 +7,17 @@ from datetime import datetime, timezone
 from sqlalchemy import DateTime, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base, SCHEMA, IS_SQLITE, JsonColumn, UuidColumn
-
-_schema = {} if IS_SQLITE else {"schema": SCHEMA}
-_fk_prefix = "" if IS_SQLITE else f"{SCHEMA}."
+from app.database import Base, SCHEMA, JsonColumn, UuidColumn
 
 
 class AnalysisResult(Base):
     __tablename__ = "analysis_results"
-    __table_args__ = _schema
+    __table_args__ = {"schema": SCHEMA}
 
     id: Mapped[str] = mapped_column(UuidColumn, primary_key=True,
                                     default=lambda: str(uuid.uuid4()))
     email_id: Mapped[str] = mapped_column(
-        ForeignKey(f"{_fk_prefix}emails.id", ondelete="CASCADE"),
+        ForeignKey(f"{SCHEMA}.emails.id", ondelete="CASCADE"),
         nullable=False, index=True,
     )
     risk_score: Mapped[float] = mapped_column(Float, nullable=False)

@@ -1,19 +1,19 @@
 """Database engine, session factory, and declarative base.
 
-Supports both SQLite (local dev, no install needed) and PostgreSQL (Docker/prod).
-Auto-detects from DATABASE_URL:
-  sqlite:///./phishdetect.db   →  local dev
-  postgresql://...             →  Docker / production
+PostgreSQL only. Alembic owns ALL DDL — application code never creates tables.
+This is the single source of truth for the schema, in dev, CI, and production alike
+(see foundation_plan.md, Phase 1).
 
-Exposes JsonColumn and UuidColumn shims so models work with both backends.
-Alembic owns all DDL for PostgreSQL. SQLite uses create_all() for local dev.
+Exposes JsonColumn (JSONB) and UuidColumn (UUID) so models read cleanly without
+importing dialect-specific types everywhere.
 """
 from __future__ import annotations
 
 from typing import Generator
 
 import structlog
-from sqlalchemy import JSON, String, create_engine, event, text
+from sqlalchemy import create_engine, text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import get_settings
@@ -22,26 +22,10 @@ log = structlog.get_logger()
 
 SCHEMA = "phishdetect"
 
-# ── Dialect-agnostic column type shims ───────────────────────────────────────
-# Models import these instead of dialect-specific JSONB / UUID.
-def _make_json_column():
-    """JSONB on Postgres, JSON on SQLite."""
-    settings = get_settings()
-    if settings.database_url.startswith("postgresql"):
-        from sqlalchemy.dialects.postgresql import JSONB
-        return JSONB
-    return JSON
-
-def _make_uuid_column():
-    """UUID on Postgres, String(36) on SQLite."""
-    settings = get_settings()
-    if settings.database_url.startswith("postgresql"):
-        from sqlalchemy.dialects.postgresql import UUID
-        return UUID(as_uuid=False)
-    return String(36)
-
-JsonColumn = _make_json_column()
-UuidColumn = _make_uuid_column()
+# ── Column types ──────────────────────────────────────────────────────────────
+# Models import these instead of dialect-specific names.
+JsonColumn = JSONB
+UuidColumn = UUID(as_uuid=False)
 
 
 class Base(DeclarativeBase):
@@ -50,19 +34,8 @@ class Base(DeclarativeBase):
 
 def _make_engine():
     settings = get_settings()
-    url = settings.database_url
-
-    if url.startswith("sqlite"):
-        # SQLite: no pool_size, enable WAL for concurrency
-        eng = create_engine(url, connect_args={"check_same_thread": False})
-        @event.listens_for(eng, "connect")
-        def set_sqlite_pragma(dbapi_conn, _):
-            dbapi_conn.execute("PRAGMA journal_mode=WAL")
-            dbapi_conn.execute("PRAGMA foreign_keys=ON")
-        return eng
-
     return create_engine(
-        url,
+        settings.database_url,
         pool_pre_ping=True,
         pool_size=10,
         max_overflow=20,
@@ -71,24 +44,19 @@ def _make_engine():
 
 engine = _make_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-IS_SQLITE = get_settings().database_url.startswith("sqlite")
 
 
 def init_db() -> None:
+    """Ensure the schema namespace exists.
+
+    Tables are owned exclusively by Alembic (the one-shot `migrate` service runs
+    `alembic upgrade head` before the API starts). This is an idempotent safety
+    net so the app fails fast with a clear log if it cannot reach the database.
     """
-    SQLite: create all tables via SQLAlchemy (no Alembic needed).
-    PostgreSQL: create schema only — Alembic handles tables.
-    """
-    if IS_SQLITE:
-        # Import all models so Base.metadata knows about them
-        import app.models  # noqa: F401
-        Base.metadata.create_all(bind=engine)
-        log.info("database.sqlite_tables_created")
-    else:
-        with engine.connect() as conn:
-            conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA}"))
-            conn.commit()
-        log.info("database.schema_ready", schema=SCHEMA)
+    with engine.connect() as conn:
+        conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA}"))
+        conn.commit()
+    log.info("database.schema_ready", schema=SCHEMA)
 
 
 def get_db() -> Generator:
