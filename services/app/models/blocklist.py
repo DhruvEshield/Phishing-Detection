@@ -29,12 +29,12 @@ class BlocklistEntry(Base):
 class FeedbackEvent(Base):
     """Feedback loop contract (Layer 1 → future Layer 2). consumed_at=None = pending."""
     __tablename__ = "feedback_events"
-    __table_args__ = _schema
+    __table_args__ = {"schema": SCHEMA}
 
     id: Mapped[str] = mapped_column(UuidColumn, primary_key=True,
                                     default=lambda: str(uuid.uuid4()))
     verdict_id: Mapped[str | None] = mapped_column(
-        ForeignKey(f"{_fk_prefix}verdicts.id", ondelete="SET NULL"),
+        ForeignKey(f"{SCHEMA}.verdicts.id", ondelete="SET NULL"),
         nullable=True, index=True,
     )
     event_type: Mapped[str] = mapped_column(String(64), nullable=False, default="analyst_verdict")
@@ -48,7 +48,7 @@ class FeedbackEvent(Base):
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
-    __table_args__ = _schema
+    __table_args__ = {"schema": SCHEMA}
 
     id: Mapped[str] = mapped_column(UuidColumn, primary_key=True,
                                     default=lambda: str(uuid.uuid4()))

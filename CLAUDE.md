@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Router
 
-**Version:** v0.1.0 · Phase 1 (pre-build) · 2026-06-25
+**Version:** v0.2.0 · Phase 1 complete · 2026-06-27
 
 This is a **light router**, not a manual. It tells you *which* context to load for the work in
 front of you. Detailed context lives in modular files under [.claude/context/](.claude/context/) —
@@ -70,15 +70,15 @@ main/
 │       ├── phishskill-integration.md # how to keep it integration-ready for PhishSkill (lean)
 │       ├── roadmap.md               # the 3 phases (currently Phase 1)
 │       └── principles.md            # 9 engineering principles + working agreement
-└── (to be created)
-    ├── services/   ├── frontend/   ├── ml/{train,inference,...}   └── infra/
+├── services/          # FastAPI detection pipeline
+├── frontend/          # React + MUI analyst dashboard
+├── ml/                # Training script, inference wrapper, governance doc
+└── infra/             # Postgres init, env template, sample fixtures
 ```
 
-> The repo is greenfield — only plans exist today. As code lands in `services/` / `frontend/` /
-> `ml/` / `infra/`, keep the matching context file current, and consider a nested `CLAUDE.md`
-> inside each once the folder has real structure.
->
-> Path note: project root is `Phishing Detection/main/`; the git repo is rooted at `main/`.
+> Path note: project root is `D:\Phishing-Detection\`.
+> Foundation hardening (Phases 1–4) complete as of 2026-06-27. Stack is fully built and running.
+> `docker compose up --build -d` brings all 4 services up from the project root.
 
 ## Keeping this system light
 
