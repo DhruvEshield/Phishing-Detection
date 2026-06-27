@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Router
 
-**Version:** v0.1.0 · Phase 1 (foundation hardening) · 2026-06-26
+**Version:** v0.2.0 · Phase 1 complete · 2026-06-27
 
 This is a **light router**, not a manual. It tells you *which* context to load for the work in
 front of you. Detailed context lives in modular files under [.claude/context/](.claude/context/) —
@@ -62,30 +62,26 @@ main/
 ├── foundation_plan.md     # Foundation setup guide — Postgres-only, Docker, migrations,
 │                          #   locked decisions, per-phase acceptance (the intern builds from this)
 ├── .gitignore             # excludes the large raw corpus + build artifacts
-├── services/              # Python API (FastAPI) — app/{api,detectors,scoring,services,models,
-│                          #   schemas}, alembic/ migrations, tests/
-├── frontend/              # React/Vite/TS analyst dashboard — src/{components,pages,lib,types}
-├── ml/                    # train.py, inference.py, governance.md, data/ (vendored corpus)
-├── infra/                 # docker-compose.yml, postgres/init.sql, samples/
-└── .claude/
-    └── context/           # Modular context — load per task (see table above)
-        ├── architecture.md          # Two layers + the feedback loop
-        ├── backend.md               # services/ — Python detection pipeline
-        ├── frontend.md              # frontend/ — analyst dashboard
-        ├── ml.md                    # ml/ — the 4 models + drift/retraining governance
-        ├── infra.md                 # infra/ — Docker, DB, queue, deploy, monitoring
-        ├── phishskill-integration.md # how to keep it integration-ready for PhishSkill (lean)
-        ├── roadmap.md               # the 3 phases (currently Phase 1)
-        └── principles.md            # 9 engineering principles + working agreement
+├── ml/data/               # vendored detection corpus (phishing_pot — see ml/data/README.md)
+├── .claude/
+│   └── context/           # Modular context — load per task (see table above)
+│       ├── architecture.md          # Two layers + the feedback loop
+│       ├── backend.md               # services/ — Python detection pipeline
+│       ├── frontend.md              # frontend/ — analyst dashboard
+│       ├── ml.md                    # ml/ — the 4 models + drift/retraining governance
+│       ├── infra.md                 # infra/ — Docker, DB, queue, deploy, monitoring
+│       ├── phishskill-integration.md # how to keep it integration-ready for PhishSkill (lean)
+│       ├── roadmap.md               # the 3 phases (currently Phase 1)
+│       └── principles.md            # 9 engineering principles + working agreement
+├── services/          # FastAPI detection pipeline
+├── frontend/          # React + MUI analyst dashboard
+├── ml/                # Training script, inference wrapper, governance doc
+└── infra/             # Postgres init, env template, sample fixtures
 ```
 
-> **No longer greenfield** — `services/` / `frontend/` / `ml/` / `infra/` now hold real code (the
-> intern's first pass). Current focus is **hardening the foundation** before more features — see
-> [foundation_plan.md](foundation_plan.md) (Postgres-only, single root docker-compose, Alembic
-> migrations, decisions locked). As areas evolve, keep the matching `.claude/context/` file current,
-> and consider a nested `CLAUDE.md` inside a folder once it grows.
->
-> Path note: project root is `Phishing Detection/main/`; the git repo is rooted at `main/`.
+> Path note: project root is `D:\Phishing-Detection\`.
+> Foundation hardening (Phases 1–4) complete as of 2026-06-27. Stack is fully built and running.
+> `docker compose up --build -d` brings all 4 services up from the project root.
 
 ## Keeping this system light
 

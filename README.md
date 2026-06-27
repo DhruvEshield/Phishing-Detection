@@ -5,27 +5,26 @@ AI-assisted phishing detection platform. Pre-delivery email analysis with a sign
 ## Quick Start
 
 ```bash
-# 1. Copy env template
-cp infra/.env.example .env
+cp .env.example .env
+docker compose up --build -d
+```
 
-# 2. Train the ML model (optional — runs rules-only if model not present)
-#    First, ensure phishing_pot emails are present:
-#    cp -r /path/to/phishing_pot/email ml/data/phishing_pot/
-python ml/train.py
+That's it. Docker Compose starts Postgres, Redis, runs migrations, then brings up the API and frontend — in the correct order automatically.
 
-# 3. Start the full stack
-docker compose -f infra/docker-compose.yml up --build
+- API: http://localhost:8000
+- Frontend: http://localhost:3000
+- Health check: http://localhost:8000/health
 
-# 4. Verify health
-curl http://localhost:8000/health
-
-# 5. POST a sample email
+**Test the pipeline with a sample email:**
+```bash
 curl -X POST http://localhost:8000/api/v1/emails/ingest \
-  -H 'Content-Type: application/json' \
+  -H "Content-Type: application/json" \
   -d @infra/samples/medium_risk_email.json
+```
 
-# 6. Open the analyst queue
-open http://localhost:3000
+**To stop:**
+```bash
+docker compose down
 ```
 
 ## Architecture
