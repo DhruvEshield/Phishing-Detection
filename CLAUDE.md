@@ -29,6 +29,7 @@ layers*, not a replacement for Defender/Proofpoint/Abnormal.
 | `frontend/` — analyst dashboard (React/Vite/TS) | [frontend.md](.claude/context/frontend.md) | `frontend-patterns`, `tdd-workflow` |
 | `ml/` — models, training, retraining | [ml.md](.claude/context/ml.md) | `tdd-workflow` |
 | `infra/` — Docker, PostgreSQL, queue, deploy, monitoring | [infra.md](.claude/context/infra.md) | `docker-patterns`, `deployment-patterns`, `database-migrations` |
+| **Setting up / running the stack** (Postgres-only, Docker, migrations, locked decisions) | [foundation_plan.md](foundation_plan.md) | `docker-patterns`, `database-migrations` |
 | **Connecting to PhishSkill** (corpus, domain-intel, shapes, UI) | [phishskill-integration.md](.claude/context/phishskill-integration.md) | — |
 | Deciding **what to build next** / is this in-phase? | [roadmap.md](.claude/context/roadmap.md) | — |
 | Any non-trivial change (the non-negotiables) | [principles.md](.claude/context/principles.md) | `security-review` |
@@ -58,6 +59,8 @@ main/
 ├── CLAUDE.md              # This router
 ├── original plan.md       # Authoritative product vision (the "why")
 ├── implementation_plan.md # Phase 1 build plan (concrete files + invariants)
+├── foundation_plan.md     # Foundation setup guide — Postgres-only, Docker, migrations,
+│                          #   locked decisions, per-phase acceptance (the intern builds from this)
 ├── .gitignore             # excludes the large raw corpus + build artifacts
 ├── ml/data/               # vendored detection corpus (phishing_pot — see ml/data/README.md)
 ├── .claude/
