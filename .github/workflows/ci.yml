@@ -38,7 +38,7 @@ jobs:
       - name: Run tests (scoring invariant must pass — others warn)
         run: |
           pytest tests/test_scoring_invariant.py -v  # hard fail
-          pytest tests/ -v --cov=app --cov-report=term-missing -k "not test_ingest_endpoint" || true
+          pytest tests/ -v --cov=app --cov-report=term-missing || true
 
   frontend:
     name: Frontend — type-check, lint
