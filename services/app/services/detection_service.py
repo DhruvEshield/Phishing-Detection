@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import structlog
-from datetime import datetime, timezone
-from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.config import get_settings

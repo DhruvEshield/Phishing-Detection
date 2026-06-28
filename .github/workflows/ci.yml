@@ -27,18 +27,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libzbar0
 
       - name: Install Python dependencies
-        run: pip install -r requirements-dev.txt
+        run: pip install -r requirements-dev.txt ruff mypy
 
       - name: Lint (ruff)
-        run: ruff check app/ tests/ || true  # warn but don't block on first pass
+        run: ruff check app/ tests/
 
       - name: Type-check (mypy)
         run: mypy app --ignore-missing-imports || true
 
-      - name: Run tests (scoring invariant must pass — others warn)
+      - name: Run tests
         run: |
-          pytest tests/test_scoring_invariant.py -v  # hard fail
-          pytest tests/ -v --cov=app --cov-report=term-missing -k "not test_ingest_endpoint" || true
+          pytest tests/test_scoring_invariant.py -v
+          pytest tests/ -v --cov=app --cov-report=term-missing -k "not test_ingest_endpoint"
 
   frontend:
     name: Frontend — type-check, lint

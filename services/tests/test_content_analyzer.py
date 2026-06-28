@@ -1,7 +1,6 @@
 """Content analyzer unit tests — ML classifier is mocked."""
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
 from dataclasses import dataclass
 

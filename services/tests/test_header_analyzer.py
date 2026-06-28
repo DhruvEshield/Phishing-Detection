@@ -1,7 +1,6 @@
 """Header analyzer unit tests — DNS calls are mocked."""
 from __future__ import annotations
 
-import pytest
 from app.detectors.header import HeaderAnalyzer
 from tests.conftest import SAMPLE_HEADERS, CLEAN_HEADERS
 
