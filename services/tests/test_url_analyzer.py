@@ -1,8 +1,7 @@
 """URL analyzer unit tests — WHOIS/RDAP and HTTP calls are mocked."""
 from __future__ import annotations
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from app.detectors.url import URLAnalyzer, _is_lookalike, _credential_harvest_heuristic
 from app.detectors.domain_intel import DomainIntel
