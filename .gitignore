@@ -10,10 +10,6 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
-# --- SQLite (never commit dev DB artifacts) ---
-*.db
-*.db-shm
-*.db-wal
 
 # --- Node / frontend ---
 node_modules/
