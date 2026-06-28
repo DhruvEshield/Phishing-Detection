@@ -2,7 +2,7 @@
 ML content classifier training script.
 
 Dataset: phishing_pot (8,614 phishing .eml, vendored at ml/data/phishing_pot/email/)
-         + Enron-ham (legitimate emails — download instructions below)
+         + Ham emails from SetFit/enron_spam (Hugging Face — auto-downloaded on first run)
 
 NOTE: This trains a TF-IDF + Logistic Regression baseline.
       The ContentClassifier interface in inference.py is swappable — replace with
@@ -36,9 +36,8 @@ from sklearn.pipeline import Pipeline
 # ── Config ───────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent
 PHISHING_DIR = BASE_DIR / "data" / "phishing_pot" / "email"
-# Enron ham: download from http://www.aueb.gr/users/ion/data/enron-spam/
-# and extract to ml/data/enron_ham/
-ENRON_HAM_DIR = BASE_DIR / "data" / "enron_ham"
+# Ham (legitimate) emails — downloaded from SetFit/enron_spam on Hugging Face
+HAM_DIR = BASE_DIR / "data" / "ham"
 MODEL_VERSION = os.getenv("MODEL_VERSION", "v0.1.0")
 MODELS_DIR = BASE_DIR / "models" / f"content_classifier_{MODEL_VERSION}"
 REPORTS_DIR = BASE_DIR / "reports"
@@ -84,20 +83,39 @@ def load_phishing(limit: int | None = None) -> list[str]:
 
 
 def load_ham(limit: int | None = None) -> list[str]:
-    """Load Enron ham emails. Falls back to synthetic samples if dir not present."""
-    if ENRON_HAM_DIR.exists():
-        paths = glob.glob(str(ENRON_HAM_DIR / "**/*.eml"), recursive=True)
+    """Load legitimate (ham) emails from SetFit/enron_spam on Hugging Face.
+    Downloads and caches to ml/data/ham/ on first run.
+    """
+    if HAM_DIR.exists() and any(HAM_DIR.iterdir()):
+        texts = []
+        for path in HAM_DIR.glob("*.txt"):
+            try:
+                texts.append(path.read_text(encoding="utf-8", errors="replace"))
+            except Exception as exc:
+                print(f"[WARN] Failed to read {path}: {exc}")
         if limit:
-            paths = paths[:limit]
-        print(f"[INFO] Loading {len(paths)} ham emails from Enron")
-        return [t for p in paths if (t := _extract_text_from_eml(p))]
-    else:
-        print(
-            "[WARN] Enron ham directory not found at ml/data/enron_ham/. "
-            "Using synthetic placeholder samples. "
-            "Download from: http://www.aueb.gr/users/ion/data/enron-spam/ "
-            "and extract to ml/data/enron_ham/ for production quality."
-        )
+            texts = texts[:limit]
+        print(f"[INFO] Loaded {len(texts)} ham emails from {HAM_DIR}")
+        return texts
+
+    print("[INFO] Downloading ham emails from SetFit/enron_spam on Hugging Face...")
+    try:
+        from datasets import load_dataset
+        dataset = load_dataset("SetFit/enron_spam", split="train")
+        ham_texts = [
+            row["text"] for row in dataset
+            if row.get("label_text", "").lower() == "ham"
+            and row.get("text", "").strip()
+        ]
+        if limit:
+            ham_texts = ham_texts[:limit]
+        HAM_DIR.mkdir(parents=True, exist_ok=True)
+        for i, text in enumerate(ham_texts):
+            (HAM_DIR / f"ham_{i:05d}.txt").write_text(text, encoding="utf-8")
+        print(f"[INFO] Downloaded and saved {len(ham_texts)} ham emails to {HAM_DIR}")
+        return ham_texts
+    except Exception as exc:
+        print(f"[WARN] Failed to download ham dataset: {exc}. Using synthetic samples.")
         return [
             "Hi, are you free for a meeting tomorrow?",
             "Please find attached the quarterly report.",
@@ -107,7 +125,7 @@ def load_ham(limit: int | None = None) -> list[str]:
             "Great work on the presentation yesterday!",
             "Can you send me the updated spreadsheet?",
             "The conference call is scheduled for 3pm.",
-        ] * 500  # inflate synthetic samples
+        ] * 500
 
 
 def main():
@@ -143,7 +161,7 @@ def main():
             min_df=2,
         )),
         ("clf", LogisticRegression(
-            C=1.0, class_weight="balanced", max_iter=MAX_ITER, n_jobs=-1,
+            C=1.0, class_weight="balanced", max_iter=MAX_ITER, n_jobs=1,
         )),
     ])
 
@@ -168,7 +186,7 @@ def main():
         "algorithm": "TF-IDF + LogisticRegression",
         "dataset": {
             "phishing": "phishing_pot (rf-peixoto/phishing_pot)",
-            "ham": "enron-spam or synthetic",
+            "ham": "SetFit/enron_spam (Hugging Face)",
             "train_size": len(X_train),
             "test_size": len(X_test),
         },

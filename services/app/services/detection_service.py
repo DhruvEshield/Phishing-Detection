@@ -31,8 +31,8 @@ log = structlog.get_logger()
 def _load_classifier():
     """Try to load the ML content classifier; return None on cold start."""
     try:
-        import sys, os
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../ml"))
+        import sys
+        sys.path.insert(0, "/app/ml")
         from inference import ContentClassifier
         settings = get_settings()
         return ContentClassifier.load(settings.model_path, settings.model_version)

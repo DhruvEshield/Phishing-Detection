@@ -30,3 +30,7 @@ build/
 
 # --- OS / editor ---
 .DS_Store
+
+# --- ML Data ---
+ml/data/phishing_pot/email/
+ml/data/ham/
