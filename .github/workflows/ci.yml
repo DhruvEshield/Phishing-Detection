@@ -27,7 +27,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libzbar0
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Lint (ruff)
         run: ruff check app/ tests/ || true  # warn but don't block on first pass
