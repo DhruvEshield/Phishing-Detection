@@ -106,13 +106,17 @@ class HeaderAnalyzer:
 
         # ── Lookalike display name ───────────────────────────────────────────
         if display_name:
-            for brand in KNOWN_BRANDS:
-                dist = levenshtein_distance(display_name, brand)
-                if 0 < dist <= 2:
-                    score += self._LOOKALIKE_DISPLAY
-                    flags.append(f"lookalike_display:{display_name}~={brand}(dist={dist})")
-                    meta["lookalike_brand"] = brand
-                    break
+            for word in display_name.split():
+                for brand in KNOWN_BRANDS:
+                    dist = levenshtein_distance(word, brand)
+                    if 0 < dist <= 2:
+                        score += self._LOOKALIKE_DISPLAY
+                        flags.append(f"lookalike_display:{word}~={brand}(dist={dist})")
+                        meta["lookalike_brand"] = brand
+                        break
+                else:
+                    continue
+                break
 
         raw_score = min(score, 100.0)
         log.info(
