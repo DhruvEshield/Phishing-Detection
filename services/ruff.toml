@@ -1,0 +1,12 @@
+# Ruff linter configuration
+# https://docs.astral.sh/ruff/configuration/
+
+target-version = "py311"
+
+[lint]
+# F821: SQLAlchemy uses string forward references in Mapped["TypeName"]
+# which ruff incorrectly flags as "Undefined name".
+# We suppress F821 only in the models directory via per-file-ignores.
+
+[lint.per-file-ignores]
+"app/models/*.py" = ["F821"]

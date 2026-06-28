@@ -11,7 +11,6 @@ import pytest
 
 from app.scoring.config import ScoringConfig
 from app.scoring.engine import ScoringEngine
-from app.detectors.base import Signal
 from tests.conftest import make_config, make_signal
 
 # All signal names in the system

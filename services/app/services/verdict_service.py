@@ -1,7 +1,6 @@
 """Verdict service — persists analyst decisions and emits FeedbackEvents."""
 from __future__ import annotations
 
-import uuid
 import structlog
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session

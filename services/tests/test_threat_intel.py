@@ -1,8 +1,6 @@
 """Threat intel unit tests — DB is mocked."""
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock, patch
 from app.detectors.threat_intel import ThreatIntelModule, ThreatIntelProvider
 
 
