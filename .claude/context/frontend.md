@@ -15,19 +15,34 @@ a verdict. The analyst's decision feeds back into the corpus and scoring
 This is where [principles.md](principles.md) #2 (human-in-the-loop) and #3 (explainability is a
 feature) become concrete UI: no decision should be a black box to the analyst.
 
-## Stack (aligned to PhishSkill)
+## Stack (confirmed — Phase 1 built)
+- **React 18 + Vite 5 + React Router + TypeScript** — SPA, no SSR needed
+- **MUI (Material UI)** — primary component library. Tailwind was removed (unused).
+- **axios** — HTTP client for API calls via `frontend/src/lib/api.ts`
+- **react-hook-form + zod** — form handling and validation
+- **Production serving:** nginx:alpine with SPA fallback config (`frontend/nginx.conf`)
+- **Dev serving:** Vite dev server via `docker-compose.override.yml`
+- **Build:** `VITE_API_BASE_URL` passed as Docker build ARG, baked in at build time
 
-- **React + Vite + React Router + TypeScript**, Tailwind + MUI, react-hook-form + zod. Consumes
-  the backend API ([backend.md](backend.md)).
-- Matches PhishSkill so the two dashboards feel like one product (not Next.js — it's an auth-gated
-  SPA, no SSR/SEO need). Before building UI, read [phishskill-integration.md](phishskill-integration.md) §3.
+## Pages (all built and verified)
+| Route | What it does |
+|---|---|
+| `/` | Redirects to `/queue` |
+| `/queue` | Paginated list of medium-risk emails — score, sender, subject, risk badge, status |
+| `/queue/[id]` | Full detail — email body, signal breakdown cards, approve/quarantine buttons |
+
+## Key components
+- `SignalBreakdownCard` — renders each detector's score bar, weight, and flags
+- `RiskBadge` — colour-coded HIGH/MEDIUM/LOW chip
+- `VerdictActions` — Approve/Quarantine buttons with optional reason textarea
+
+## API client
+Typed fetch wrapper at `frontend/src/lib/api.ts`:
+- `listQueue(page, pageSize)` — GET /api/v1/queue
+- `getEmailDetail(emailId)` — GET /api/v1/queue/{email_id}
+- `submitVerdict(req)` — POST /api/v1/verdicts
 
 ## Conventions
-
-- **Explanation-first UI.** Every flagged email shows *why* — the weighted signals that
-  produced its score — not just a number. Analysts must trust a decision before acting on it.
-- **Review queue is the core loop.** Medium-risk emails land here; the verdict an analyst
-  records is training data and a feedback signal, so capture it cleanly and completely.
-- **Surface Layer 2 alerts** (behavioural / identity / relationship) alongside email triage —
-  retroactive-review results need an analyst destination.
-- Follow `frontend-patterns` for component structure, state management, and performance.
+- **Explanation-first UI.** Every flagged email shows the weighted signal breakdown — not just a number.
+- **Review queue is the core loop.** Analyst verdict is captured cleanly and feeds back as a FeedbackEvent.
+- No SSR, no Next.js — plain React SPA served by nginx.

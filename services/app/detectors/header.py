@@ -118,6 +118,17 @@ class HeaderAnalyzer:
                     continue
                 break
 
+        # ── Lookalike sender domain ──────────────────────────────────────────
+        if sender_domain:
+            sender_root = re.split(r'[.\-]', sender_domain)[0]
+            for brand in KNOWN_BRANDS:
+                dist = levenshtein_distance(sender_root, brand)
+                if 0 < dist <= 2:
+                    score += self._LOOKALIKE_DISPLAY
+                    flags.append(f"lookalike_sender_domain:{sender_domain}~={brand}(dist={dist})")
+                    meta["lookalike_domain"] = sender_domain
+                    break
+
         raw_score = min(score, 100.0)
         log.info(
             "detector.header", score=raw_score, flags=flags,
