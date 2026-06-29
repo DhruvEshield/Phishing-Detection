@@ -15,35 +15,43 @@ Also exposes the data the frontend dashboard and Layer 2 monitoring consume.
 
 See [architecture.md](architecture.md) for the signal table and routing tiers.
 
-## Stack (intended direction — pin versions in `requirements.txt` as code lands)
+## Stack (confirmed — Phase 1 built)
+- **API:** FastAPI 0.115.5 + Uvicorn 0.32.0. Async, typed, OpenAPI auto-generated.
+- **Email auth checks:** dnspython, pyspf, dkimpy for SPF/DKIM/DMARC validation.
+- **Task queue:** Redis + RQ declared in stack. RQ wiring (worker + enqueue) deferred — detection runs synchronously for now.
+- **Persistence:** PostgreSQL 16 via SQLAlchemy 2.0 + Alembic migrations. 7 tables under `phishdetect` schema.
+- **ML inference:** ContentClassifier interface in `ml/inference.py` — backend calls it, never trains.
 
-- **API:** FastAPI (async, typed, OpenAPI out of the box) + Uvicorn.
-- **Email parsing:** stdlib `email` / `mailparser`; auth checks via DNS + SPF/DKIM/DMARC libs.
-- **Task queue / async pipeline:** Celery (or similar) for sandboxing, link-following,
-  retro reviews — anything slow or external goes off the request path.
-- **Persistence:** PostgreSQL (see [infra.md](infra.md)) for emails, scores, verdicts, audit.
+## Detectors (all built and tested)
+| Detector | File | What it checks |
+|---|---|---|
+| HeaderAnalyzer | `app/detectors/header.py` | SPF/DKIM/DMARC, reply-to mismatch, lookalike display name |
+| ContentAnalyzer | `app/detectors/content.py` | Urgency language (rules) + ML classifier (TF-IDF + LR) |
+| URLAnalyzer | `app/detectors/url.py` | Credential harvest pages, lookalike domains, redirect chains |
+| QRCodeDetector | `app/detectors/qrcode_detector.py` | QR codes in images, decoded URLs fed through URLAnalyzer |
+| ThreatIntelModule | `app/detectors/threat_intel.py` | Blocklist lookups against `blocklist_entries` table |
 
-ML inference (content classifier, anomaly, graph, QR) is owned by [ml.md](ml.md); the backend
-**calls** those models and turns their outputs into weighted signals — it does not train them.
+## Scoring engine
+`app/scoring/engine.py` — aggregates all 5 signals into a 0–100 weighted score.
+**Invariant enforced in code:** no single signal can independently breach `HIGH_THRESHOLD`.
+`test_scoring_invariant.py` proves this parametrically for every signal.
+
+## API endpoints
+- `POST /api/v1/emails/ingest` — ingest + score + persist + route
+- `GET /api/v1/queue` — paginated analyst review queue
+- `GET /api/v1/queue/{email_id}` — full detail with signal breakdown
+- `POST /api/v1/verdicts` — analyst approve/quarantine, creates FeedbackEvent
+- `GET /health` — liveness check
+
+## Feedback loop contract
+`FeedbackEvent` + `FeedbackProducer` interface + `feedback_events` table. Stub producer writes to Postgres. Layer 2 consumer plugs in later without changing the interface.
+
+## Tests
+38 tests, all passing. Run inside Docker: `docker compose exec api pytest tests/ -v`
+Critical: `test_scoring_invariant.py` must always pass — it's a hard CI fail.
 
 ## Conventions
-
-- **Signals aggregate; they don't individually decide.** Each detector returns a weighted
-  contribution to the risk score. No hard-coded single-signal block. Keep weights configurable
-  and auditable. (See [principles.md](principles.md) #1.)
-- **Explainability from day one.** Every score must be traceable to the signals that produced
-  it — store the breakdown, not just the total. Phase 2 formalises this; design for it now.
-- **Capture data early.** Log email metadata, verdicts, and analyst decisions from the start
-  (within governance limits) — Phase 3 baselines depend on history that only exists if Phase 1
-  stored it.
-- **Security-first.** This handles email content and account metadata — treat all of it as
-  sensitive: least-privilege, encryption, audit trails, retention controls. Run the
-  `security-review` skill when touching auth, input handling, secrets, or new endpoints.
-- **Rules before ML.** Only reach for a model where [ml.md](ml.md) justifies it; prefer
-  heuristics where they suffice.
-
-## API design
-
-Follow the `api-design` skill for resource naming, status codes, pagination, error shape.
-The frontend ([frontend.md](frontend.md)) is the primary consumer — surface flagged emails,
-risk scores, the signal breakdown (explanation), and verdicts.
+- **Signals aggregate; they don't individually decide.** No hard-coded single-signal block.
+- **Explainability from day one.** Every score is traceable to signals — stored in `explanation_json`.
+- **Rules before ML.** Content analyzer runs rules first, blends ML score on top.
+- **Security-first.** Least-privilege, audit trails, retention controls on all email data.

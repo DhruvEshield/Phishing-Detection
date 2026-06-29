@@ -20,21 +20,35 @@ model outputs as weighted signals — it does not train them.
 | Relationship analysis | Graph-based modelling | Detects structural anomalies (a lookalike node inserting into a trusted cluster) invisible to content scanning |
 | QR extraction | Computer vision | QR images can't be read by text parsers; narrow, well-defined image task |
 
-## Stack (intended direction — pin versions as code lands)
+## Stack (confirmed — Phase 1 built)
+- **Content classifier:** TF-IDF + Logistic Regression (scikit-learn 1.6.1). Swappable via `ContentClassifier` interface in `ml/inference.py`.
+- **QR extraction:** OpenCV + pyzbar. Built into `QRCodeDetector` in the backend.
+- **Behavioural anomaly + relationship graph:** Phase 3 — not built yet.
 
-- **NLP / content classification:** scikit-learn for baselines; spaCy / Hugging Face
-  Transformers (PyTorch) for the production classifier.
-- **Anomaly detection:** scikit-learn (e.g. IsolationForest) initially; revisit per data volume.
-- **Graph analysis:** NetworkX for modelling; a graph store (e.g. Neo4j) if/when scale demands.
-- **Computer vision (QR):** OpenCV + a QR decoder (e.g. `pyzbar` / OpenCV QR detector).
+## Content classifier — what's built
+| Item | Detail |
+|---|---|
+| Algorithm | TF-IDF vectorisation + Logistic Regression |
+| Training data | 8,612 phishing emails (phishing_pot) + 15,553 legitimate emails (SetFit/enron_spam, Hugging Face) |
+| Accuracy | 99% |
+| F1 (phishing) | 0.986 |
+| Model version | v0.1.0 |
+| Model location | `ml/models/content_classifier_v0.1.0/pipeline.joblib` (gitignored) |
 
-## Governance guardrail (enforce in code AND process)
+## Files
+- `ml/train.py` — training script, auto-downloads ham dataset from Hugging Face on first run
+- `ml/inference.py` — `ContentClassifier` interface, loads versioned model, exposes `predict(text)`
+- `ml/evaluate.py` — standalone evaluation script, runs trained model against full dataset
+- `ml/governance.md` — retraining triggers, process, and drift monitoring plan
+- `ml/models/` — gitignored, built by `train.py`
+- `ml/reports/` — gitignored, written by `train.py` and `evaluate.py`
+- `ml/data/phishing_pot/email/` — 8,612 real phishing .eml files (gitignored, large)
+- `ml/data/ham/` — downloaded ham emails (gitignored, auto-downloaded by train.py)
 
-Classification and anomaly models **drift**. All AI-driven decisions stay **subject to analyst
-review and periodic retraining** — never fully automated enforcement. Build for
-human-in-the-loop, explainability, and retraining **from day one**. Treat every model as a
-maintained asset with a retraining path, not a one-time artifact.
+## Retraining triggers (from governance.md)
+- F1 drops > 5% on monthly eval
+- Analyst override rate > 20% over 30 days
+- Manual approval gate before deploying new version
 
-> Phase note: the content classifier and QR extraction are Phase 1. Behavioural anomaly and
-> relationship graph are **Phase 3** — they need accumulated history to avoid high false
-> positives. Don't build them before Phase 1's data pipeline exists. See [roadmap.md](roadmap.md).
+## Governance guardrail
+All ML decisions stay subject to analyst review — never fully automated enforcement. Every model version is tracked in `AnalysisResult.model_version` so drift is visible from production data.

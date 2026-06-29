@@ -60,3 +60,13 @@ def test_weighted_contribution_correct():
     signal = analyzer.analyse(SAMPLE_HEADERS, weight=0.25)
     expected = round(signal.raw_score * 0.25, 4)
     assert abs(signal.weighted_contribution - expected) < 0.001
+
+
+def test_lookalike_sender_domain_detected():
+    headers = {
+        "From": '"IT Support" <support@micros0ft-helpdesk.com>',
+        "Authentication-Results": "spf=pass dkim=pass dmarc=pass",
+    }
+    analyzer = HeaderAnalyzer()
+    signal = analyzer.analyse(headers, weight=0.25)
+    assert any("lookalike_sender_domain" in f for f in signal.flags)
