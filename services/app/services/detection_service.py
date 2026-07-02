@@ -16,7 +16,7 @@ from app.detectors.header import HeaderAnalyzer
 from app.detectors.content import ContentAnalyzer
 from app.detectors.url import URLAnalyzer
 from app.detectors.qrcode_detector import QRCodeDetector
-from app.detectors.threat_intel import ThreatIntelModule, LocalBlocklistAdapter
+from app.detectors.threat_intel import ThreatIntelModule, ChainedThreatIntelProvider
 from app.scoring.config import ScoringConfig
 from app.scoring.engine import ScoringEngine
 from app.models.email import Email
@@ -62,7 +62,7 @@ class DetectionService:
         self._url = URLAnalyzer()
         self._qr = QRCodeDetector(url_analyzer=self._url)
         self._threat = ThreatIntelModule(
-            provider=LocalBlocklistAdapter(db)
+            provider=ChainedThreatIntelProvider(db)
         )
 
     async def analyse(self, request: EmailIngestRequest) -> EmailAnalysisResponse:

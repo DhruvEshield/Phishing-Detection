@@ -63,14 +63,95 @@ class LocalBlocklistAdapter(ThreatIntelProvider):
 
 class ExternalFeedAdapter(ThreatIntelProvider):
     """
-    Phase 1 stub for an external threat intel feed.
-    Implement by replacing this class body with real API calls.
+    Phase 1 implementation for an external threat intel feed using Google Safe Browsing.
+    Persists confirmed hits to the local blocklist.
     """
+    def __init__(self, db: Session):
+        self._db = db
+
     def is_blocked(self, indicator: str, indicator_type: str) -> tuple[bool, Optional[str]]:
-        raise NotImplementedError(
-            "ExternalFeedAdapter is a Phase 1 stub. "
-            "Implement with VirusTotal / OTX / etc. and inject via DI."
+        from datetime import datetime, timedelta, timezone
+        from app.detectors.safe_browsing import check_url
+        from app.models.blocklist import BlocklistEntry
+        
+        # Prepare URL for Safe Browsing. If bare domain, prepend scheme and append trailing slash.
+        check_target = indicator
+        if indicator_type == "domain":
+            check_target = f"https://{indicator}/"
+            
+        result = check_url(check_target)
+        
+        if result is None:
+            # Network error, timeout, or missing key -> fail open and log warning
+            log.warning("threat_intel.safe_browsing.failed", indicator=indicator, indicator_type=indicator_type)
+            return False, None
+            
+        if not result.get("flagged"):
+            # URL is clean -> do not persist
+            return False, None
+            
+        # URL is flagged -> check if it already exists in the blocklist
+        existing = (
+            self._db.query(BlocklistEntry)
+            .filter(
+                BlocklistEntry.indicator == indicator.lower(),
+                BlocklistEntry.indicator_type == indicator_type
+            )
+            .first()
         )
+        
+        now = datetime.now(timezone.utc)
+        if existing:
+            # Option (a): Update existing row to a fresh 30 days.
+            # This prevents stale database bloat while keeping the entry active.
+            existing.expires_at = now + timedelta(days=30)
+            existing.source = "safe_browsing"
+            try:
+                self._db.commit()
+            except Exception as e:
+                self._db.rollback()
+                log.error("threat_intel.safe_browsing.db_update_error", error=str(e), indicator=indicator)
+        else:
+            new_entry = BlocklistEntry(
+                indicator=indicator.lower(),
+                indicator_type=indicator_type,
+                source="safe_browsing",
+                expires_at=now + timedelta(days=30)
+            )
+            self._db.add(new_entry)
+            try:
+                self._db.commit()
+                log.info("threat_intel.safe_browsing.persisted", indicator=indicator, indicator_type=indicator_type)
+            except Exception as e:
+                self._db.rollback()
+                log.error("threat_intel.safe_browsing.db_error", error=str(e), indicator=indicator)
+                
+        return True, "safe_browsing"
+
+
+class ChainedThreatIntelProvider(ThreatIntelProvider):
+    """
+    Composes LocalBlocklistAdapter and ExternalFeedAdapter.
+    Checks the local blocklist first to avoid unnecessary external API calls.
+    """
+    def __init__(self, db: Session):
+        self._local = LocalBlocklistAdapter(db)
+        self._external = ExternalFeedAdapter(db)
+
+    def is_blocked(self, indicator: str, indicator_type: str) -> tuple[bool, Optional[str]]:
+        try:
+            blocked, source = self._local.is_blocked(indicator, indicator_type)
+            if blocked:
+                return blocked, source
+        except Exception as e:
+            log.error("threat_intel.chained.local_error", error=str(e), indicator=indicator)
+            
+        try:
+            return self._external.is_blocked(indicator, indicator_type)
+        except Exception as e:
+            log.error("threat_intel.chained.external_error", error=str(e), indicator=indicator)
+            
+        return False, None
 
 
 # ── Detector ──────────────────────────────────────────────────────────────────
