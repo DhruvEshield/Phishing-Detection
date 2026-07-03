@@ -21,6 +21,20 @@ KNOWN_BRANDS = [
     "linkedin", "facebook", "twitter", "netflix", "docusign",
 ]
 
+BRAND_DOMAINS: dict[str, str] = {
+    "microsoft": "microsoft.com",
+    "google": "google.com",
+    "amazon": "amazon.com",
+    "apple": "apple.com",
+    "paypal": "paypal.com",
+    "dropbox": "dropbox.com",
+    "linkedin": "linkedin.com",
+    "facebook": "facebook.com",
+    "twitter": "twitter.com",
+    "netflix": "netflix.com",
+    "docusign": "docusign.com",
+}
+
 
 def _parse_display_name(from_header: str) -> tuple[str, str]:
     """Return (display_name, email_address) from a From header."""
@@ -72,6 +86,7 @@ class HeaderAnalyzer:
     _REPLY_TO_MISMATCH = 20
     _LOOKALIKE_DISPLAY = 25
     _EXACT_BRAND_IMPERSONATION = 30
+    _BRAND_IMPERSONATION_MISMATCH = 35
 
     def analyse(self, headers: dict[str, str], weight: float) -> Signal:
         score = 0.0
@@ -140,6 +155,23 @@ class HeaderAnalyzer:
                     flags.append(f"lookalike_sender_domain:{sender_domain}~={brand}(dist={dist})")
                     meta["lookalike_domain"] = sender_domain
                     break
+
+        # ── Brand impersonation — display name claims brand but sender domain doesn't match ───
+        if display_name and sender_domain:
+            for word in display_name.lower().split():
+                if word in BRAND_DOMAINS:
+                    expected_domain = BRAND_DOMAINS[word]
+                    if not sender_domain.endswith(expected_domain):
+                        score += self._BRAND_IMPERSONATION_MISMATCH
+                        flags.append(
+                            f"brand_impersonation:{word}(sender:{sender_domain},expected:{expected_domain})"
+                        )
+                        meta["brand_impersonation"] = {
+                            "claimed_brand": word,
+                            "sender_domain": sender_domain,
+                            "expected_domain": expected_domain,
+                        }
+                        break
 
         raw_score = min(score, 100.0)
         log.info(
