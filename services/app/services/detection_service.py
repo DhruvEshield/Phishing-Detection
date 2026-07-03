@@ -80,12 +80,17 @@ class DetectionService:
             ar = existing.analysis
             return self._build_response(existing, ar)
 
-        # ── Run all 5 detectors concurrently ─────────────────────────────────
-        def run_header():
-            return self._header.analyse(request.headers, weight=self._cfg.weights["header"])
+        # ── Run header synchronously for context, then rest concurrently ─────
+        header_signal = self._header.analyse(request.headers, weight=self._cfg.weights["header"])
 
         def run_content():
-            return self._content.analyse(request.body_text, weight=self._cfg.weights["content"])
+            brand_impersonation_ctx = header_signal.metadata.get("brand_impersonation")
+            return self._content.analyse(
+                body_text=request.body_text,
+                body_html=request.body_html,
+                weight=self._cfg.weights["content"],
+                context={"brand_impersonation": brand_impersonation_ctx},
+            )
 
         def run_url():
             return self._url.analyse(request.body_text, request.body_html,
@@ -99,13 +104,13 @@ class DetectionService:
                                         request.body_html, weight=self._cfg.weights["threat_intel"])
 
         loop = asyncio.get_event_loop()
-        signals = await asyncio.gather(
-            loop.run_in_executor(None, run_header),
+        other_signals = await asyncio.gather(
             loop.run_in_executor(None, run_content),
             loop.run_in_executor(None, run_url),
             loop.run_in_executor(None, run_qr),
             loop.run_in_executor(None, run_threat),
         )
+        signals = [header_signal] + list(other_signals)
 
         # ── Score ─────────────────────────────────────────────────────────────
         result = self._engine.compute(list(signals))

@@ -51,7 +51,7 @@ class ContentAnalyzer:
         """
         self._classifier = classifier
 
-    def analyse(self, body_text: str, weight: float) -> Signal:
+    def analyse(self, body_text: str, body_html: str, weight: float, context: dict | None = None) -> Signal:
         flags: list[str] = []
         meta: dict = {}
 
@@ -104,6 +104,14 @@ class ContentAnalyzer:
             raw_score = rule_score
 
         raw_score = min(raw_score, 100.0)
+
+        # ── Inter-detector boost: brand impersonation confirmed by header ──────
+        if context and context.get("brand_impersonation") and meta.get("ml_label") == "phishing":
+            boost = 20.0
+            raw_score = min(raw_score + boost, 100.0)
+            flags.append("brand_impersonation_confirmed(header+ml)")
+            log.info("detector.content.brand_boost", boost=boost, action="content_analysis")
+
         log.info("detector.content", score=raw_score, flags=flags,
                  action="content_analysis")
         return Signal(name="content", raw_score=raw_score, weight=weight,
