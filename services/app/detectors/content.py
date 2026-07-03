@@ -79,6 +79,7 @@ class ContentAnalyzer:
 
         # ── ML classifier layer ──────────────────────────────────────────────
         ml_score = 0.0
+        use_ml = True
         if self._classifier is not None and text.strip():
             try:
                 result = self._classifier.predict(text)
@@ -93,9 +94,11 @@ class ContentAnalyzer:
                     "detector.content.ml_error", error=str(exc),
                     action="content_analysis",
                 )
+                ml_score = 0.0
+                use_ml = False
 
         # Blend: 40% rules, 60% ML (or 100% rules if no ML)
-        if self._classifier is not None:
+        if self._classifier is not None and use_ml:
             raw_score = 0.40 * rule_score + 0.60 * ml_score
         else:
             raw_score = rule_score
