@@ -70,3 +70,27 @@ def test_lookalike_sender_domain_detected():
     analyzer = HeaderAnalyzer()
     signal = analyzer.analyse(headers, weight=0.25)
     assert any("lookalike_sender_domain" in f for f in signal.flags)
+
+
+def test_spf_pass_from_received_spf_header():
+    """SPF result should be read correctly from Received-SPF header format."""
+    headers = {
+        "From": "amazon@amazon.com",
+        "Received-SPF": "pass (google.com: domain of amazon.com designates 1.2.3.4 as permitted sender) client-ip=1.2.3.4;",
+        "Authentication-Results": "dkim=pass dmarc=pass",
+    }
+    analyzer = HeaderAnalyzer()
+    signal = analyzer.analyse(headers, weight=0.25)
+    assert not any("spf_" in f for f in signal.flags), f"SPF should not be flagged but got: {signal.flags}"
+
+
+def test_brand_impersonation_detected():
+    """Display name claims Amazon but sender domain is not amazon.com."""
+    headers = {
+        "From": '"Amazon" <support@vinciengage.com>',
+        "Authentication-Results": "spf=pass dkim=pass dmarc=pass",
+    }
+    analyzer = HeaderAnalyzer()
+    signal = analyzer.analyse(headers, weight=0.25)
+    assert any("brand_impersonation" in f for f in signal.flags), \
+        f"Brand impersonation should be flagged but got: {signal.flags}"

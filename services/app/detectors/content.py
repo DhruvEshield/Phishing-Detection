@@ -51,7 +51,7 @@ class ContentAnalyzer:
         """
         self._classifier = classifier
 
-    def analyse(self, body_text: str, weight: float) -> Signal:
+    def analyse(self, body_text: str, body_html: str, weight: float, context: dict | None = None) -> Signal:
         flags: list[str] = []
         meta: dict = {}
 
@@ -79,6 +79,7 @@ class ContentAnalyzer:
 
         # ── ML classifier layer ──────────────────────────────────────────────
         ml_score = 0.0
+        use_ml = True
         if self._classifier is not None and text.strip():
             try:
                 result = self._classifier.predict(text)
@@ -93,14 +94,24 @@ class ContentAnalyzer:
                     "detector.content.ml_error", error=str(exc),
                     action="content_analysis",
                 )
+                ml_score = 0.0
+                use_ml = False
 
         # Blend: 40% rules, 60% ML (or 100% rules if no ML)
-        if self._classifier is not None:
+        if self._classifier is not None and use_ml:
             raw_score = 0.40 * rule_score + 0.60 * ml_score
         else:
             raw_score = rule_score
 
         raw_score = min(raw_score, 100.0)
+
+        # ── Inter-detector boost: brand impersonation confirmed by header ──────
+        if context and context.get("brand_impersonation") and meta.get("ml_label") == "phishing":
+            boost = 20.0
+            raw_score = min(raw_score + boost, 100.0)
+            flags.append("brand_impersonation_confirmed(header+ml)")
+            log.info("detector.content.brand_boost", boost=boost, action="content_analysis")
+
         log.info("detector.content", score=raw_score, flags=flags,
                  action="content_analysis")
         return Signal(name="content", raw_score=raw_score, weight=weight,

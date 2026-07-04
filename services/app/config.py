@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     # ── Security ──────────────────────────────────────────────────────────────
     secret_key: str = "change-me-in-production"
 
+    # ── External APIs ─────────────────────────────────────────────────────────
+    google_safe_browsing_key: Optional[str] = None
+
 
 @lru_cache
 def get_settings() -> Settings:

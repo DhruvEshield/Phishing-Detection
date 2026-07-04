@@ -44,8 +44,10 @@ def test_blocklist_url_in_body_detected():
 
 def test_stub_provider_does_not_crash():
     """ExternalFeedAdapter raises NotImplementedError — module should not crash."""
+    from unittest.mock import MagicMock
     from app.detectors.threat_intel import ExternalFeedAdapter
-    module = ThreatIntelModule(ExternalFeedAdapter())
+    mock_db = MagicMock()
+    module = ThreatIntelModule(ExternalFeedAdapter(mock_db))
     signal = module.analyse({"From": "x@y.com"}, "", "", 0.10)
     assert signal.raw_score == 0.0  # stub skipped silently
 

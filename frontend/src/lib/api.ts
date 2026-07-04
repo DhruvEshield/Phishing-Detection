@@ -27,3 +27,14 @@ export async function getEmailDetail(emailId: string): Promise<EmailDetail> {
 export async function submitVerdict(req: VerdictRequest): Promise<void> {
   await api.post('/verdicts', req);
 }
+
+export async function ingestEml(file: File): Promise<EmailDetail> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await axios.post<ApiResponse<EmailDetail>>(
+    `${BASE}/api/v1/emails/ingest/eml`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return res.data.data;
+}

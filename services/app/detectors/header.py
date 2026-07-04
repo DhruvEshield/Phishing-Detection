@@ -21,6 +21,20 @@ KNOWN_BRANDS = [
     "linkedin", "facebook", "twitter", "netflix", "docusign",
 ]
 
+BRAND_DOMAINS: dict[str, str] = {
+    "microsoft": "microsoft.com",
+    "google": "google.com",
+    "amazon": "amazon.com",
+    "apple": "apple.com",
+    "paypal": "paypal.com",
+    "dropbox": "dropbox.com",
+    "linkedin": "linkedin.com",
+    "facebook": "facebook.com",
+    "twitter": "twitter.com",
+    "netflix": "netflix.com",
+    "docusign": "docusign.com",
+}
+
 
 def _parse_display_name(from_header: str) -> tuple[str, str]:
     """Return (display_name, email_address) from a From header."""
@@ -31,12 +45,19 @@ def _parse_display_name(from_header: str) -> tuple[str, str]:
 
 
 def _spf_result(headers: dict[str, str]) -> Optional[str]:
-    """Extract SPF result from Received-SPF or Authentication-Results headers."""
-    for key in ("Received-SPF", "Authentication-Results"):
-        val = headers.get(key, "")
-        m = re.search(r"spf=(\w+)", val, re.IGNORECASE)
+    """Extract SPF result from Received-SPF or Authentication-Results headers.
+    Received-SPF format: 'pass (google.com: ...)' — result is the first word.
+    Authentication-Results format: 'spf=pass ...'
+    """
+    received_spf = headers.get("Received-SPF", "")
+    if received_spf:
+        m = re.match(r"(\w+)", received_spf.strip(), re.IGNORECASE)
         if m:
             return m.group(1).lower()
+    auth = headers.get("Authentication-Results", "")
+    m = re.search(r"spf=(\w+)", auth, re.IGNORECASE)
+    if m:
+        return m.group(1).lower()
     return None
 
 
@@ -64,6 +85,8 @@ class HeaderAnalyzer:
     _DMARC_FAIL = 15
     _REPLY_TO_MISMATCH = 20
     _LOOKALIKE_DISPLAY = 25
+    _EXACT_BRAND_IMPERSONATION = 30
+    _BRAND_IMPERSONATION_MISMATCH = 35
 
     def analyse(self, headers: dict[str, str], weight: float) -> Signal:
         score = 0.0
@@ -109,9 +132,13 @@ class HeaderAnalyzer:
             for word in display_name.split():
                 for brand in KNOWN_BRANDS:
                     dist = levenshtein_distance(word, brand)
-                    if 0 < dist <= 2:
-                        score += self._LOOKALIKE_DISPLAY
-                        flags.append(f"lookalike_display:{word}~={brand}(dist={dist})")
+                    if 0 <= dist <= 2:
+                        if dist == 0:
+                            score += self._EXACT_BRAND_IMPERSONATION
+                            flags.append(f"exact_brand_display:{word}=={brand}")
+                        else:
+                            score += self._LOOKALIKE_DISPLAY
+                            flags.append(f"lookalike_display:{word}~={brand}(dist={dist})")
                         meta["lookalike_brand"] = brand
                         break
                 else:
@@ -128,6 +155,23 @@ class HeaderAnalyzer:
                     flags.append(f"lookalike_sender_domain:{sender_domain}~={brand}(dist={dist})")
                     meta["lookalike_domain"] = sender_domain
                     break
+
+        # ── Brand impersonation — display name claims brand but sender domain doesn't match ───
+        if display_name and sender_domain:
+            for word in display_name.lower().split():
+                if word in BRAND_DOMAINS:
+                    expected_domain = BRAND_DOMAINS[word]
+                    if not sender_domain.endswith(expected_domain):
+                        score += self._BRAND_IMPERSONATION_MISMATCH
+                        flags.append(
+                            f"brand_impersonation:{word}(sender:{sender_domain},expected:{expected_domain})"
+                        )
+                        meta["brand_impersonation"] = {
+                            "claimed_brand": word,
+                            "sender_domain": sender_domain,
+                            "expected_domain": expected_domain,
+                        }
+                        break
 
         raw_score = min(score, 100.0)
         log.info(
