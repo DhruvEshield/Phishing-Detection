@@ -7,9 +7,12 @@ Sandbox detonation is Phase 2 — stubbed via SandboxProvider interface.
 from __future__ import annotations
 
 import re
+from urllib.parse import urlparse
 from typing import Optional
 import structlog
+import unicodedata
 import httpx
+import ipaddress
 import tldextract
 from Levenshtein import distance as levenshtein_distance
 
@@ -85,6 +88,90 @@ def _credential_harvest_heuristic(url: str) -> bool:
     return False
 
 
+def _inspect_form_action(url: str, timeout: float = 5.0) -> Optional[str]:
+    """Fetch page HTML and check if any form submits to a different domain.
+    Only called for URLs that already look suspicious.
+    Returns suspicious form action URL if found, None otherwise.
+    """
+    try:
+        ssrf_guard(extract_domain(url))
+        resp = httpx.get(
+            url, timeout=timeout, follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        html = resp.text
+        actions = re.findall(r'<form[^>]+action=["\']([^"\']+)["\']', html, re.IGNORECASE)
+        for action in actions:
+            if action.startswith("http") or action.startswith("//"):
+                action_domain = extract_domain(action)
+                url_domain = extract_domain(url)
+                if action_domain and url_domain and action_domain != url_domain:
+                    return action
+    except Exception:
+        pass
+    return None
+
+
+def _url_structure_red_flags(url: str) -> list[str]:
+    """Check for common URL structure tricks used in phishing.
+    Returns list of flags for any red flags found.
+    """
+    flags = []
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+
+        # Raw IP as host — legitimate companies never use raw IPs in emails
+        try:
+            ipaddress.ip_address(hostname)
+            flags.append(f"raw_ip_host:{hostname}")
+        except ValueError:
+            pass
+
+        # @ trick — everything before @ is a fake username, real destination is after
+        if "@" in (parsed.netloc or ""):
+            flags.append(f"at_trick:{url[:80]}")
+
+        # Excessive subdomains — real domain buried under many subdomains
+        parts = [p for p in hostname.split(".") if p]
+        if len(parts) > 4:
+            flags.append(f"excessive_subdomains({len(parts)}):{hostname}")
+
+    except Exception:
+        pass
+    return flags
+
+
+def _normalize_for_homoglyph(domain: str) -> str:
+    """Normalize domain to detect homoglyph and punycode attacks.
+    Decodes punycode (xn--...) and normalizes unicode characters to ASCII equivalents.
+    """
+    try:
+        # Decode punycode domain to unicode
+        decoded = domain.encode('ascii').decode('idna')
+    except Exception:
+        decoded = domain
+    # Normalize unicode — decompose and strip combining marks
+    normalized = unicodedata.normalize('NFKD', decoded)
+    normalized = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+    return normalized.lower()
+
+
+def _is_homoglyph_lookalike(domain: str) -> Optional[str]:
+    """Check if domain uses homoglyphs or punycode to impersonate a known brand."""
+    from app.detectors.header import KNOWN_BRANDS
+    normalized = _normalize_for_homoglyph(domain)
+    domain_root = re.split(r'[.\-]', normalized)[0]
+    for brand in KNOWN_BRANDS:
+        dist = levenshtein_distance(domain_root, brand)
+        if 0 < dist <= 2:
+            return brand
+        # Also check if normalized root exactly matches brand (pure homoglyph)
+        if domain_root == brand and domain_root != domain.split('.')[0].lower():
+            return brand
+    return None
+
+
 class SandboxProvider:
     """
     Phase 2 stub. Raises NotImplementedError so callers know it's not built yet.
@@ -113,12 +200,16 @@ class URLAnalyzer:
         meta["url_count"] = len(urls)
         suspicious_urls = []
 
+        domain_cache: dict[str, object] = {}
         for url in urls[:10]:  # cap at 10 to bound latency
             domain = extract_domain(url)
             url_flags: list[str] = []
-
-            # Domain age via RDAP
-            intel = get_domain_intel(domain, timeout=get_settings().rdap_timeout)
+            
+            if domain in domain_cache:
+                intel = domain_cache[domain]
+            else:
+                intel = get_domain_intel(domain, timeout=get_settings().rdap_timeout)
+                domain_cache[domain] = intel
             if intel.is_newly_registered:
                 url_flags.append(f"newly_registered:{domain}")
                 score += 20
@@ -128,6 +219,18 @@ class URLAnalyzer:
             if matched:
                 url_flags.append(f"lookalike:{domain}~={matched}")
                 score += 25
+
+            # ── Homoglyph/punycode check ──────────────────────────────
+            homoglyph_brand = _is_homoglyph_lookalike(domain)
+            if homoglyph_brand and not _is_lookalike(domain):
+                score += 25
+                url_flags.append(f"homoglyph_lookalike:{domain}~={homoglyph_brand}")
+
+            # ── URL structure red flags ────────────────────────────────────
+            structure_flags = _url_structure_red_flags(url)
+            if structure_flags:
+                url_flags.extend(structure_flags)
+                score += 15 * len(structure_flags)
 
             # Redirect chain
             final_url, chain = _follow_redirects(url, self._max_hops, self._timeout)
@@ -139,6 +242,13 @@ class URLAnalyzer:
             if _credential_harvest_heuristic(final_url):
                 url_flags.append(f"credential_harvest_page:{final_url[:80]}")
                 score += 20
+
+            # ── Form action inspection (only for already-suspicious URLs) ──
+            if url_flags:
+                suspicious_action = _inspect_form_action(final_url, timeout=self._timeout)
+                if suspicious_action:
+                    url_flags.append(f"suspicious_form_action:{suspicious_action[:80]}")
+                    score += 25
 
             if url_flags:
                 suspicious_urls.append({"url": url[:200], "flags": url_flags})

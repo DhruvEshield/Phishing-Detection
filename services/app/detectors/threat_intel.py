@@ -38,26 +38,16 @@ class LocalBlocklistAdapter(ThreatIntelProvider):
 
     def is_blocked(self, indicator: str, indicator_type: str) -> tuple[bool, Optional[str]]:
         from app.models.blocklist import BlocklistEntry
-        from sqlalchemy import and_, or_
         from datetime import datetime, timezone
 
-        now = datetime.now(timezone.utc)
-        entry = (
-            self._db.query(BlocklistEntry)
-            .filter(
-                and_(
-                    BlocklistEntry.indicator == indicator.lower(),
-                    BlocklistEntry.indicator_type == indicator_type,
-                    or_(
-                        BlocklistEntry.expires_at.is_(None),
-                        BlocklistEntry.expires_at > now,
-                    ),
-                )
-            )
-            .first()
-        )
-        if entry:
-            return True, f"blocklist:{entry.source}"
+        entries = self._db.query(BlocklistEntry).filter(
+            BlocklistEntry.indicator == indicator.lower(),
+            BlocklistEntry.indicator_type == indicator_type,
+            (BlocklistEntry.expires_at == None) | (BlocklistEntry.expires_at > datetime.now(timezone.utc)),
+        ).all()
+        if entries:
+            sources = list({e.source for e in entries})
+            return True, f"blocklist:{','.join(sorted(sources))}(hits:{len(entries)})"
         return False, None
 
 

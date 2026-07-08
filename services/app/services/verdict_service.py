@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import structlog
-from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.verdict import Verdict
-from app.models.blocklist import FeedbackEvent, AuditLog
+from app.models.email import Email
+from app.models.blocklist import FeedbackEvent, AuditLog, BlocklistEntry
+from app.detectors.domain_intel import extract_domain
+from datetime import datetime, timezone, timedelta
 from app.models.queue_entry import QueueEntry
 from app.models.analysis import AnalysisResult
 from app.schemas.feedback import VerdictRequest, VerdictResponse
@@ -61,6 +63,27 @@ class VerdictService:
             tenant_id=req.tenant_id,
         )
         self._db.add(fb_event)
+
+        # ── Feedback loop: quarantine verdict → add sender domain to blocklist ──
+        if req.action.value == "quarantine":
+            email_obj = self._db.query(Email).filter(Email.id == req.email_id).first() if not locals().get('email_obj') else email_obj
+            if email_obj and email_obj.sender:
+                sender_domain = extract_domain(email_obj.sender)
+                if sender_domain:
+                    existing = self._db.query(BlocklistEntry).filter(
+                        BlocklistEntry.indicator == sender_domain.lower(),
+                        BlocklistEntry.indicator_type == "domain",
+                        BlocklistEntry.source == "analyst_verdict",
+                    ).first()
+                    if not existing:
+                        self._db.add(BlocklistEntry(
+                            indicator=sender_domain.lower(),
+                            indicator_type="domain",
+                            source="analyst_verdict",
+                            tenant_id=req.tenant_id,
+                            expires_at=datetime.now(timezone.utc) + timedelta(days=90),
+                        ))
+                        log.info("blocklist.added", domain=sender_domain, source="analyst_verdict")
 
         # Audit trail (principle #5 + #7)
         self._db.add(AuditLog(
