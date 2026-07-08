@@ -112,5 +112,5 @@ def extract_domain(url_or_address: str) -> str:
     if "://" in url_or_address:
         return urlparse(url_or_address).hostname or url_or_address
     if "@" in url_or_address:
-        return url_or_address.split("@")[-1].strip().lower()
+        return url_or_address.split("@")[-1].strip().strip("<>").lower()
     return url_or_address.strip().lower()

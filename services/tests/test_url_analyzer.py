@@ -67,3 +67,40 @@ def test_score_capped_at_100(mock_redir, mock_intel):
     body = " ".join([f"http://evil{i}.com/verify" for i in range(20)])
     signal = analyzer.analyse(body_text=body, body_html="", weight=0.25)
     assert signal.raw_score <= 100.0
+
+
+def test_homoglyph_lookalike_detected():
+    """Punycode domain that decodes to a brand lookalike should be flagged."""
+    analyzer = URLAnalyzer()
+    # xn--pypal-4ve.com is punycode for a homoglyph of paypal.com
+    signal = analyzer.analyse(
+        body_text="Click here: http://xn--pypal-4ve.com/login",
+        body_html="",
+        weight=0.25,
+    )
+    assert any("homoglyph_lookalike" in f or "lookalike" in f for f in signal.flags), \
+        f"Homoglyph lookalike should be flagged but got: {signal.flags}"
+
+
+def test_raw_ip_host_detected():
+    """URLs with raw IP addresses should be flagged."""
+    analyzer = URLAnalyzer()
+    signal = analyzer.analyse(
+        body_text="Click here: http://185.220.101.45/login",
+        body_html="",
+        weight=0.25,
+    )
+    assert any("raw_ip_host" in f for f in signal.flags), \
+        f"Raw IP should be flagged but got: {signal.flags}"
+
+
+def test_excessive_subdomains_detected():
+    """URLs with excessive subdomains should be flagged."""
+    analyzer = URLAnalyzer()
+    signal = analyzer.analyse(
+        body_text="Click here: http://login.verify.account.microsoft.evil.com/steal",
+        body_html="",
+        weight=0.25,
+    )
+    assert any("excessive_subdomains" in f for f in signal.flags), \
+        f"Excessive subdomains should be flagged but got: {signal.flags}"

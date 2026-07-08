@@ -10,6 +10,7 @@ import re
 import structlog
 
 from app.detectors.base import Signal
+from app.detectors.header import BRAND_DOMAINS
 
 log = structlog.get_logger()
 
@@ -44,6 +45,8 @@ class ContentAnalyzer:
     ML score blended in when model is available.
     """
 
+    _BODY_BRAND_IMPERSONATION = 15
+
     def __init__(self, classifier=None):
         """
         classifier: object with .predict(text: str) -> ClassificationResult
@@ -51,7 +54,7 @@ class ContentAnalyzer:
         """
         self._classifier = classifier
 
-    def analyse(self, body_text: str, body_html: str, weight: float, context: dict | None = None) -> Signal:
+    def analyse(self, body_text: str, body_html: str = "", weight: float = 0.0, context: dict | None = None) -> Signal:
         flags: list[str] = []
         meta: dict = {}
 
@@ -76,6 +79,21 @@ class ContentAnalyzer:
             flags.append(f"credential_request({credential_hits})")
         if authority_hits:
             flags.append(f"authority_impersonation({authority_hits})")
+
+        # ── Body brand impersonation ─────────────────────────────────────────
+        sender_domain = (context or {}).get("sender_domain", "")
+        if sender_domain and text:
+            body_lower = text.lower()
+            for brand, expected_domain in BRAND_DOMAINS.items():
+                if brand in body_lower and not sender_domain.endswith(expected_domain):
+                    rule_score += self._BODY_BRAND_IMPERSONATION
+                    flags.append(f"body_brand_mention:{brand}(sender:{sender_domain})")
+                    meta["body_brand_impersonation"] = {
+                        "brand": brand,
+                        "sender_domain": sender_domain,
+                        "expected_domain": expected_domain,
+                    }
+                    break
 
         # ── ML classifier layer ──────────────────────────────────────────────
         ml_score = 0.0

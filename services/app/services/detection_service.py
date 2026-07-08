@@ -85,12 +85,19 @@ class DetectionService:
 
         def run_content():
             brand_impersonation_ctx = header_signal.metadata.get("brand_impersonation")
-            return self._content.analyse(
+            sender_domain = header_signal.metadata.get("spf", None) and request.headers.get("From", "")
+            from app.detectors.domain_intel import extract_domain
+            sender_domain = extract_domain(request.headers.get("From", ""))
+            content_signal = self._content.analyse(
                 body_text=request.body_text,
                 body_html=request.body_html,
                 weight=self._cfg.weights["content"],
-                context={"brand_impersonation": brand_impersonation_ctx},
+                context={
+                    "brand_impersonation": brand_impersonation_ctx,
+                    "sender_domain": sender_domain,
+                },
             )
+            return content_signal
 
         def run_url():
             return self._url.analyse(request.body_text, request.body_html,
