@@ -99,25 +99,27 @@ class DetectionService:
             )
             return content_signal
 
-        def run_url():
-            return self._url.analyse(request.body_text, request.body_html,
-                                     weight=self._cfg.weights["url"])
+        # Run URL analyzer synchronously to extract redirect URLs for threat intel
+        url_signal = self._url.analyse(request.body_text, request.body_html,
+                                       weight=self._cfg.weights["url"])
+        redirect_final_urls = url_signal.metadata.get("redirect_final_urls", [])
 
         def run_qr():
             return self._qr.analyse(request.body_html, weight=self._cfg.weights["qrcode"])
 
         def run_threat():
-            return self._threat.analyse(request.headers, request.body_text,
+            # Build extra body text with redirect final URLs for threat intel
+            extra_body = request.body_text + " " + " ".join(redirect_final_urls)
+            return self._threat.analyse(request.headers, extra_body,
                                         request.body_html, weight=self._cfg.weights["threat_intel"])
 
         loop = asyncio.get_event_loop()
         other_signals = await asyncio.gather(
             loop.run_in_executor(None, run_content),
-            loop.run_in_executor(None, run_url),
             loop.run_in_executor(None, run_qr),
             loop.run_in_executor(None, run_threat),
         )
-        signals = [header_signal] + list(other_signals)
+        signals = [header_signal, url_signal] + list(other_signals)
 
         # ── Score ─────────────────────────────────────────────────────────────
         result = self._engine.compute(list(signals))

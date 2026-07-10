@@ -56,6 +56,7 @@ class Settings(BaseSettings):
 
     # ── External APIs ─────────────────────────────────────────────────────────
     google_safe_browsing_key: Optional[str] = None
+    phishtank_api_key: Optional[str] = None
 
 
 @lru_cache

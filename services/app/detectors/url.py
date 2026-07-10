@@ -237,6 +237,9 @@ class URLAnalyzer:
             if len(chain) > 2:
                 url_flags.append(f"redirect_chain({len(chain)}hops)")
                 score += 10
+            # Store final redirect URL for threat intel handoff
+            if final_url != url:
+                meta.setdefault("redirect_final_urls", []).append(final_url)
 
             # Credential harvest heuristic
             if _credential_harvest_heuristic(final_url):
