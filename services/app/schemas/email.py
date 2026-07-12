@@ -11,6 +11,7 @@ class AttachmentMeta(BaseModel):
     filename: str
     content_type: str
     size_bytes: int
+    content_bytes: Optional[bytes] = None
 
 
 class EmailIngestRequest(BaseModel):

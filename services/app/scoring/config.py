@@ -45,5 +45,6 @@ class ScoringConfig:
                 "url":          settings.weight_url,
                 "qrcode":       settings.weight_qrcode,
                 "threat_intel": settings.weight_threat_intel,
+                "attachment":   settings.weight_attachment,
             },
         )

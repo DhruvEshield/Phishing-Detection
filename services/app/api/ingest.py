@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas.common import ApiResponse
-from app.schemas.email import EmailIngestRequest
+from app.schemas.email import EmailIngestRequest, AttachmentMeta
 from app.schemas.scoring import EmailAnalysisResponse
 from app.services.detection_service import DetectionService
 
@@ -55,11 +55,29 @@ def _parse_eml(raw: bytes) -> EmailIngestRequest:
         body_text = msg.get_payload(decode=True).decode(
             msg.get_content_charset() or "utf-8", errors="replace"
         )
+    # Extract attachments
+    attachments = []
+    if msg.is_multipart():
+        for part in msg.walk():
+            content_disposition = part.get_content_disposition()
+            if content_disposition == "attachment":
+                filename = part.get_filename() or "unknown"
+                content_type = part.get_content_type() or "application/octet-stream"
+                payload = part.get_payload(decode=True) or b""
+                attachments.append(
+                    AttachmentMeta(
+                        filename=filename,
+                        content_type=content_type,
+                        size_bytes=len(payload),
+                        content_bytes=payload,
+                    )
+                )
+
     return EmailIngestRequest(
         headers=headers,
         body_text=body_text,
         body_html=body_html,
-        attachments=[],
+        attachments=attachments,
         raw_mime=None,
         metadata={"source": "eml_upload"},
     )

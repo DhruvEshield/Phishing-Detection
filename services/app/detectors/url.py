@@ -30,6 +30,17 @@ VENDOR_DOMAINS = [
     "slack.com", "github.com", "salesforce.com",
 ]
 
+SUSPICIOUS_TLDS = {
+    ".tk", ".ml", ".ga", ".cf", ".gq",
+    ".top", ".xyz", ".zip", ".mov",
+    ".click", ".link", ".work",
+}
+
+URL_SHORTENER_DOMAINS = {
+    "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly",
+    "is.gd", "buff.ly", "rebrand.ly", "shorturl.at", "cutt.ly",
+}
+
 _URL_PATTERN = re.compile(r'https?://[^\s<>"\']+', re.IGNORECASE)
 
 
@@ -142,6 +153,28 @@ def _url_structure_red_flags(url: str) -> list[str]:
     return flags
 
 
+def _tld_and_shortener_flags(url: str) -> list[str]:
+    """Check for suspicious TLDs and known URL shortener domains.
+    Returns list of flags for any red flags found.
+    """
+    flags = []
+    try:
+        parsed = urlparse(url)
+        hostname = (parsed.hostname or "").lower()
+
+        for tld in SUSPICIOUS_TLDS:
+            if hostname.endswith(tld):
+                flags.append(f"suspicious_tld:{hostname}")
+                break
+
+        if hostname in URL_SHORTENER_DOMAINS:
+            flags.append(f"url_shortener:{hostname}")
+
+    except Exception:
+        pass
+    return flags
+
+
 def _normalize_for_homoglyph(domain: str) -> str:
     """Normalize domain to detect homoglyph and punycode attacks.
     Decodes punycode (xn--...) and normalizes unicode characters to ASCII equivalents.
@@ -232,11 +265,20 @@ class URLAnalyzer:
                 url_flags.extend(structure_flags)
                 score += 15 * len(structure_flags)
 
+            # ── TLD and shortener red flags ────────────────────────────────
+            tld_flags = _tld_and_shortener_flags(url)
+            if tld_flags:
+                url_flags.extend(tld_flags)
+                score += 10 * len(tld_flags)
+
             # Redirect chain
             final_url, chain = _follow_redirects(url, self._max_hops, self._timeout)
             if len(chain) > 2:
                 url_flags.append(f"redirect_chain({len(chain)}hops)")
                 score += 10
+            # Store final redirect URL for threat intel handoff
+            if final_url != url:
+                meta.setdefault("redirect_final_urls", []).append(final_url)
 
             # Credential harvest heuristic
             if _credential_harvest_heuristic(final_url):

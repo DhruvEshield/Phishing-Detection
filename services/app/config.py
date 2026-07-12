@@ -29,11 +29,12 @@ class Settings(BaseSettings):
     # INVARIANT: max(weight_*) * 100 < high_threshold
     # With defaults: 0.30 * 100 = 30 < 70  ✓
     # ScoringConfig validates this on startup.
-    weight_header: float = 0.25
+    weight_header: float = 0.20
     weight_content: float = 0.30
     weight_url: float = 0.25
-    weight_qrcode: float = 0.10
-    weight_threat_intel: float = 0.10
+    weight_qrcode: float = 0.08
+    weight_threat_intel: float = 0.07
+    weight_attachment: float = 0.10
 
     # ── ML ────────────────────────────────────────────────────────────────────
     model_version: str = "v0.1.0"
@@ -56,6 +57,7 @@ class Settings(BaseSettings):
 
     # ── External APIs ─────────────────────────────────────────────────────────
     google_safe_browsing_key: Optional[str] = None
+    phishtank_api_key: Optional[str] = None
 
 
 @lru_cache
