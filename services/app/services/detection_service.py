@@ -17,6 +17,7 @@ from app.detectors.content import ContentAnalyzer
 from app.detectors.url import URLAnalyzer
 from app.detectors.qrcode_detector import QRCodeDetector
 from app.detectors.threat_intel import ThreatIntelModule, ChainedThreatIntelProvider
+from app.detectors.attachment_analyzer import AttachmentAnalyzer
 from app.scoring.config import ScoringConfig
 from app.scoring.engine import ScoringEngine
 from app.models.email import Email
@@ -64,6 +65,7 @@ class DetectionService:
         self._threat = ThreatIntelModule(
             provider=ChainedThreatIntelProvider(db)
         )
+        self._attachment = AttachmentAnalyzer()
 
     async def analyse(self, request: EmailIngestRequest) -> EmailAnalysisResponse:
         settings = get_settings()
@@ -113,11 +115,18 @@ class DetectionService:
             return self._threat.analyse(request.headers, extra_body,
                                         request.body_html, weight=self._cfg.weights["threat_intel"])
 
+        def run_attachment():
+            return self._attachment.analyse(
+                attachments=request.attachments,
+                weight=self._cfg.weights["attachment"],
+            )
+
         loop = asyncio.get_event_loop()
         other_signals = await asyncio.gather(
             loop.run_in_executor(None, run_content),
             loop.run_in_executor(None, run_qr),
             loop.run_in_executor(None, run_threat),
+            loop.run_in_executor(None, run_attachment),
         )
         signals = [header_signal, url_signal] + list(other_signals)
 
@@ -131,7 +140,7 @@ class DetectionService:
             raw_headers_json=request.headers,
             body_text=request.body_text,
             body_html=request.body_html,
-            attachments_json=[a.model_dump() for a in request.attachments],
+            attachments_json=[a.model_dump(exclude={"content_bytes"}) for a in request.attachments],
             sender=from_header,
             subject=request.headers.get("Subject", ""),
             routing_decision=result.routing_decision,
