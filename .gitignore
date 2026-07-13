@@ -21,8 +21,19 @@ build/
 # --- OS / editor ---
 .DS_Store
 
+# --- Claude Code (personal / per-machine — the shared config lives in .claude/) ---
+.claude/settings.local.json
+
+# --- Dev bind-mount artifact: container mounts ./ml files into ./services/ml ---
+services/ml/
+
 # --- ML Data ---
 ml/data/phishing_pot/email/
 ml/data/ham/
+ml/data/spamassassin_ham/
+ml/data/modern_ham/
 ml/models/
 ml/reports/
+# Note: generator/normalizer scripts (gen_modern_ham.py, text_normalize.py,
+# eval_samples.py, diagnose.py) are code and stay tracked; only the corpora
+# they download/produce are ignored above.

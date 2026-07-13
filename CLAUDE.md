@@ -5,7 +5,7 @@
 This is a **light router**, not a manual. It tells you *which* context to load for the work in
 front of you. Detailed context lives in modular files under [.claude/context/](.claude/context/) —
 load only what's relevant so context stays focused. The authoritative product vision is
-[original plan.md](original%20plan.md) (the "why").
+[docs/vision/original plan.md](docs/vision/original%20plan.md) (the "why").
 
 > **Read order:** this file → the one or two context files for your task → the plan only if you
 > need product intent. Don't load everything up front.
@@ -29,11 +29,12 @@ layers*, not a replacement for Defender/Proofpoint/Abnormal.
 | `frontend/` — analyst dashboard (React/Vite/TS) | [frontend.md](.claude/context/frontend.md) | `frontend-patterns`, `tdd-workflow` |
 | `ml/` — models, training, retraining | [ml.md](.claude/context/ml.md) | `tdd-workflow` |
 | `infra/` — Docker, PostgreSQL, queue, deploy, monitoring | [infra.md](.claude/context/infra.md) | `docker-patterns`, `deployment-patterns`, `database-migrations` |
-| **Setting up / running the stack** (Postgres-only, Docker, migrations, locked decisions) | [foundation_plan.md](foundation_plan.md) | `docker-patterns`, `database-migrations` |
+| **Setting up / running the stack** (Postgres-only, Docker, migrations, locked decisions) | [docs/plans/foundation_plan.md](docs/plans/foundation_plan.md) | `docker-patterns`, `database-migrations` |
 | **Connecting to PhishSkill** (corpus, domain-intel, shapes, UI) | [phishskill-integration.md](.claude/context/phishskill-integration.md) | — |
 | Deciding **what to build next** / is this in-phase? | [roadmap.md](.claude/context/roadmap.md) | — |
 | Any non-trivial change (the non-negotiables) | [principles.md](.claude/context/principles.md) | `security-review` |
-| Investigating threats / techniques / market | [original plan.md](original%20plan.md) | `deep-research` |
+| Investigating threats / techniques / market | [docs/vision/original plan.md](docs/vision/original%20plan.md) | `deep-research` |
+| **Assessing direction / competitors / what to build next** | [docs/research/competitive-audit-and-roadmap.md](docs/research/competitive-audit-and-roadmap.md) | `deep-research` |
 
 > **PhishSkill:** this tool is standalone (build & test it on its own, no PhishSkill access
 > needed) but is designed to connect to **PhishSkill** later — that's the maintainer's step, not a
@@ -57,13 +58,23 @@ Full detail behind each: [principles.md](.claude/context/principles.md).
 ```
 main/
 ├── CLAUDE.md              # This router
-├── original plan.md       # Authoritative product vision (the "why")
-├── implementation_plan.md # Phase 1 build plan (concrete files + invariants)
-├── foundation_plan.md     # Foundation setup guide — Postgres-only, Docker, migrations,
-│                          #   locked decisions, per-phase acceptance (the intern builds from this)
+├── README.md             # Quick start (docker compose up) + architecture overview
+├── docs/                  # Plans, vision & strategy (kept out of the root; see docs/README.md)
+│   ├── vision/            # The "why" — product vision & strategy
+│   │   └── original plan.md           # Authoritative product vision
+│   ├── plans/            # Build & setup plans
+│   │   ├── implementation_plan.md     # Phase 1 build plan (concrete files + invariants)
+│   │   └── foundation_plan.md         # Foundation setup — Docker, migrations, locked decisions
+│   └── research/         # Audits, market & threat research
+│       └── competitive-audit-and-roadmap.md  # Market audit + prioritized roadmap (2026-07)
 ├── .gitignore             # excludes the large raw corpus + build artifacts
 ├── ml/data/               # vendored detection corpus (phishing_pot — see ml/data/README.md)
 ├── .claude/
+│   ├── README.md          # Cheat-sheet: what the agents + commands are, when to use them
+│   ├── SETUP.md           # Fresh-machine setup (incl. the settings.json to add by hand)
+│   ├── agents/            # Specialist sub-agents: planner, architect, code-reviewer,
+│   │                      #   security-reviewer, tdd-guide, brainstormer, doc-updater
+│   ├── commands/          # Slash commands: /plan /tdd /code-review /verify /learn /log
 │   └── context/           # Modular context — load per task (see table above)
 │       ├── architecture.md          # Two layers + the feedback loop
 │       ├── backend.md               # services/ — Python detection pipeline

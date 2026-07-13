@@ -47,7 +47,7 @@ These match our production-MVP bar — adopt them (in Python):
 
 ## Working agreement for AI assistants
 
-- **Read [original plan.md](../../original%20plan.md) for the "why"; read the slim
+- **Read [original plan.md](../../docs/vision/original%20plan.md) for the "why"; read the slim
   [CLAUDE.md](../../CLAUDE.md) for the "how" and which context file to load.** If the two ever
   conflict, the plan wins on product intent — update the docs to match.
 - **Respect the phase order.** Don't build Phase 3 behavioural analytics before Phase 1's data

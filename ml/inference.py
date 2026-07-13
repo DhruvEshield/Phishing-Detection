@@ -14,6 +14,8 @@ from typing import Optional
 import joblib
 import structlog
 
+from text_normalize import normalize_text
+
 log = structlog.get_logger()
 
 
@@ -66,7 +68,15 @@ class ContentClassifier:
                 label="legitimate", confidence=1.0, model_version=self._version
             )
 
-        proba = self._pipeline.predict_proba([text])[0]
+        # Same normalization used at training time (ml/train.py). Must match, or
+        # the model sees a different distribution in production than it learned.
+        normalized = normalize_text(text)
+        if not normalized:
+            return ClassificationResult(
+                label="legitimate", confidence=1.0, model_version=self._version
+            )
+
+        proba = self._pipeline.predict_proba([normalized])[0]
         classes = self._pipeline.classes_.tolist()
         phish_idx = classes.index("phishing")
         confidence = float(proba[phish_idx])

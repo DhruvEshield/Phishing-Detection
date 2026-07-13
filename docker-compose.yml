@@ -52,9 +52,16 @@ services:
       dockerfile: Dockerfile
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
+    # .env supplies scoring weights/thresholds/timeouts/logging into the container.
+    # The environment: block below OVERRIDES it for values that must differ in
+    # Docker (DB/Redis point at service names, not the host ports in .env).
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-phishdetect}:${POSTGRES_PASSWORD:-phishdetect}@postgres:5432/${POSTGRES_DB:-phishdetect}
       REDIS_URL: redis://redis:6379/0
+      MODEL_VERSION: ${MODEL_VERSION:-v0.1.0}
+      MODEL_PATH: ${MODEL_PATH:-ml/models}
     ports:
       - "8000:8000"
     depends_on:
@@ -67,6 +74,7 @@ services:
     volumes:
       - ./ml/models:/app/ml/models:ro
       - ./ml/inference.py:/app/ml/inference.py:ro
+      - ./ml/text_normalize.py:/app/ml/text_normalize.py:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 15s
