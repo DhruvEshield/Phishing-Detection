@@ -43,7 +43,7 @@ class LocalBlocklistAdapter(ThreatIntelProvider):
         entries = self._db.query(BlocklistEntry).filter(
             BlocklistEntry.indicator == indicator.lower(),
             BlocklistEntry.indicator_type == indicator_type,
-            (BlocklistEntry.expires_at == None) | (BlocklistEntry.expires_at > datetime.now(timezone.utc)),
+            (BlocklistEntry.expires_at.is_(None)) | (BlocklistEntry.expires_at > datetime.now(timezone.utc)),
         ).all()
         if entries:
             sources = list({e.source for e in entries})

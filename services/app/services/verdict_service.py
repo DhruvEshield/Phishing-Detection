@@ -66,7 +66,7 @@ class VerdictService:
 
         # ── Feedback loop: quarantine verdict → add sender domain to blocklist ──
         if req.action.value == "quarantine":
-            email_obj = self._db.query(Email).filter(Email.id == req.email_id).first() if not locals().get('email_obj') else email_obj
+            email_obj = self._db.query(Email).filter(Email.id == req.email_id).first()
             if email_obj and email_obj.sender:
                 sender_domain = extract_domain(email_obj.sender)
                 if sender_domain:

@@ -1,6 +1,5 @@
 """Tests for AttachmentAnalyzer detector."""
 from __future__ import annotations
-import pytest
 from app.detectors.attachment_analyzer import AttachmentAnalyzer
 from app.schemas.email import AttachmentMeta
 

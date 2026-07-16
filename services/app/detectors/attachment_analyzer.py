@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import structlog
-from typing import TYPE_CHECKING
 
 from app.detectors.base import Signal
 from app.schemas.email import AttachmentMeta

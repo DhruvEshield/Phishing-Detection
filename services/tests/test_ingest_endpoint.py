@@ -2,7 +2,6 @@
 All external calls (DB, ML classifier) are mocked.
 """
 from __future__ import annotations
-import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from app.main import app
