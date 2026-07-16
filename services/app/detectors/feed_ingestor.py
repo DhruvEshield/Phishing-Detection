@@ -28,7 +28,6 @@ log = structlog.get_logger()
 
 OPENPHISH_URL = "https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt"
 URLHAUS_URL = "https://urlhaus.abuse.ch/downloads/csv_online/"
-PHISHTANK_URL = "https://data.phishtank.com/data/{api_key}/online-valid.csv"
 
 _HEADERS = {"User-Agent": "PhishDetect/1.0 (security-research)"}
 _TIMEOUT = 30.0
@@ -132,37 +131,6 @@ def ingest_urlhaus(db: Session) -> int:
         return 0
 
 
-def ingest_phishtank(db: Session) -> int:
-    """Download and ingest PhishTank feed. Returns count of entries processed."""
-    settings = get_settings()
-    api_key = getattr(settings, "phishtank_api_key", None)
-    if not api_key:
-        log.warning("feed_ingestor.phishtank.no_key")
-        return 0
-    try:
-        url = PHISHTANK_URL.format(api_key=api_key)
-        resp = httpx.get(url, headers=_HEADERS, timeout=_TIMEOUT)
-        resp.raise_for_status()
-        count = 0
-        reader = csv.DictReader(io.StringIO(resp.text))
-        for row in reader:
-            phish_url = row.get("url", "").strip()
-            if not phish_url or not phish_url.startswith("http"):
-                continue
-            _upsert_indicator(db, _normalize_url(phish_url), "url", "phishtank")
-            domain = _normalize_domain(phish_url)
-            if domain:
-                _upsert_indicator(db, domain, "domain", "phishtank")
-            count += 1
-        db.commit()
-        log.info("feed_ingestor.phishtank.done", count=count)
-        return count
-    except Exception as exc:
-        db.rollback()
-        log.error("feed_ingestor.phishtank.error", error=str(exc))
-        return 0
-
-
 def ingest_all_feeds() -> None:
     """Run all feed ingestors. Called by background thread."""
     db: Session = SessionLocal()
@@ -170,12 +138,10 @@ def ingest_all_feeds() -> None:
         log.info("feed_ingestor.start")
         openphish_count = ingest_openphish(db)
         urlhaus_count = ingest_urlhaus(db)
-        phishtank_count = ingest_phishtank(db)
         log.info(
             "feed_ingestor.complete",
             openphish=openphish_count,
             urlhaus=urlhaus_count,
-            phishtank=phishtank_count,
         )
     except Exception as exc:
         log.error("feed_ingestor.fatal", error=str(exc))
