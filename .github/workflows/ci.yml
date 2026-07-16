@@ -37,13 +37,11 @@ jobs:
 
       - name: Run tests
         run: |
-<<<<<<< HEAD
-          pytest tests/test_scoring_invariant.py -v  # hard fail
-          pytest tests/ -v --cov=app --cov-report=term-missing || true
-=======
+          # Invariant test is the hard gate — no single signal may breach HIGH_THRESHOLD.
           pytest tests/test_scoring_invariant.py -v
-          pytest tests/ -v --cov=app --cov-report=term-missing -k "not test_ingest_endpoint"
->>>>>>> cc0ede0ce9ca167262dda3769136a83f94e46842
+          # Full suite (all 58 pass without a DB/model — DB is mocked, classifier
+          # degrades to rules-only when the gitignored model is absent).
+          pytest tests/ -v --cov=app --cov-report=term-missing
 
   frontend:
     name: Frontend — type-check, lint
