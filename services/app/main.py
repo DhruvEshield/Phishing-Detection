@@ -62,10 +62,13 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://localhost:3010"
+        "http://localhost:3010",
+        "https://mail.google.com",
+        "https://www.gmail.com",
     ],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 # ── Routes ────────────────────────────────────────────────────────────────────

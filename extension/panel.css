@@ -1,0 +1,221 @@
+#phishdetect-panel {
+  position: fixed;
+  top: 120px;
+  right: 20px;
+  width: 280px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  font-size: 13px;
+  z-index: 9999;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+#phishdetect-header {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+
+#phishdetect-logo {
+  font-weight: 700;
+  font-size: 14px;
+  color: #1a73e8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#phishdetect-close {
+  cursor: pointer;
+  color: #999;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+#phishdetect-close:hover {
+  color: #333;
+}
+
+#phishdetect-summary {
+  padding: 12px 16px;
+}
+
+#phishdetect-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+#phishdetect-score {
+  font-size: 24px;
+  font-weight: 700;
+  color: #202124;
+}
+
+#phishdetect-score span {
+  font-size: 12px;
+  font-weight: 400;
+  color: #999;
+}
+
+.phishdetect-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.phishdetect-badge.LOW {
+  background: #e6f4ea;
+  color: #137333;
+}
+
+.phishdetect-badge.MEDIUM {
+  background: #fef7e0;
+  color: #b06000;
+}
+
+.phishdetect-badge.HIGH {
+  background: #fce8e6;
+  color: #c5221f;
+}
+
+.phishdetect-badge.CRITICAL {
+  background: #c5221f;
+  color: #ffffff;
+}
+
+#phishdetect-progress {
+  height: 6px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+#phishdetect-progress-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+#phishdetect-verdict {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+#phishdetect-toggle-btn {
+  width: 100%;
+  padding: 8px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #1a73e8;
+  font-weight: 600;
+  text-align: center;
+  transition: background 0.2s;
+}
+
+#phishdetect-toggle-btn:hover {
+  background: #e8f0fe;
+}
+
+#phishdetect-details {
+  display: none;
+  border-top: 1px solid #f0f0f0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+#phishdetect-details.visible {
+  display: block;
+}
+
+.phishdetect-signal {
+  padding: 10px 16px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.phishdetect-signal:last-child {
+  border-bottom: none;
+}
+
+.phishdetect-signal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.phishdetect-signal-name {
+  font-weight: 600;
+  color: #202124;
+  font-size: 12px;
+}
+
+.phishdetect-signal-score {
+  font-size: 11px;
+  color: #666;
+}
+
+.phishdetect-signal-bar {
+  height: 4px;
+  background: #f0f0f0;
+  border-radius: 2px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.phishdetect-signal-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.phishdetect-signal-bar-fill.low { background: #34a853; }
+.phishdetect-signal-bar-fill.medium { background: #fbbc04; }
+.phishdetect-signal-bar-fill.high { background: #ea4335; }
+
+.phishdetect-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.phishdetect-flag {
+  background: #f1f3f4;
+  color: #444;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  word-break: break-all;
+}
+
+#phishdetect-loading {
+  padding: 20px 16px;
+  text-align: center;
+  color: #666;
+  font-size: 12px;
+}
+
+#phishdetect-error {
+  padding: 12px 16px;
+  color: #c5221f;
+  font-size: 12px;
+  background: #fce8e6;
+  border-radius: 6px;
+  margin: 8px;
+}
