@@ -173,6 +173,8 @@ class ThreatIntelModule:
                 indicators.append((domain, "domain"))
             indicators.append((url[:512], "url"))
 
+        # Deduplicate indicators to avoid redundant Safe Browsing calls
+        indicators = list(dict.fromkeys(indicators))
         blocked_found: list[str] = []
         for indicator, itype in indicators:
             try:

@@ -17,6 +17,8 @@ from urllib.parse import urlparse
 
 import httpx
 import structlog
+import json
+import redis
 
 log = structlog.get_logger()
 
@@ -67,10 +69,12 @@ class DomainIntel:
 def get_domain_intel(domain: str, timeout: float = 5.0) -> DomainIntel:
     """
     Fetch RDAP data for *domain*. SSRF guard fires first.
+    Results cached in Redis for 24 hours to avoid repeated slow lookups.
     Safe-fails: on any error returns DomainIntel with rdap_error set.
     """
     intel = DomainIntel(domain=domain)
 
+    # ── SSRF guard ────────────────────────────────────────────────────────
     try:
         ssrf_guard(domain)
     except ValueError as exc:
@@ -79,6 +83,23 @@ def get_domain_intel(domain: str, timeout: float = 5.0) -> DomainIntel:
         log.warning("domain_intel.ssrf_blocked", domain=domain, reason=str(exc))
         return intel
 
+    # ── Redis cache check ─────────────────────────────────────────────────
+    cache_key = f"rdap:{domain}"
+    try:
+        r = _get_redis_client()
+        cached = r.get(cache_key)
+        if cached:
+            data = json.loads(cached)
+            intel.age_days = data.get("age_days")
+            intel.registrar = data.get("registrar")
+            intel.is_newly_registered = data.get("is_newly_registered", False)
+            intel.flags = data.get("flags", [])
+            log.info("domain_intel.cache_hit", domain=domain)
+            return intel
+    except Exception as exc:
+        log.warning("domain_intel.redis_error", error=str(exc))
+
+    # ── RDAP lookup ───────────────────────────────────────────────────────
     try:
         with httpx.Client(timeout=timeout, follow_redirects=True) as client:
             resp = client.get(f"{RDAP_BOOTSTRAP}{domain}")
@@ -100,9 +121,37 @@ def get_domain_intel(domain: str, timeout: float = 5.0) -> DomainIntel:
 
         intel.registrar = (data.get("entities") or [{}])[0].get("fn")
 
+        # ── Cache result in Redis for 24 hours ────────────────────────────
+        try:
+            r = _get_redis_client()
+            cache_data = {
+                "age_days": intel.age_days,
+                "registrar": intel.registrar,
+                "is_newly_registered": intel.is_newly_registered,
+                "flags": intel.flags,
+            }
+            r.setex(cache_key, 86400, json.dumps(cache_data))
+            log.info("domain_intel.cached", domain=domain)
+        except Exception as exc:
+            log.warning("domain_intel.redis_cache_error", error=str(exc))
+
     except httpx.HTTPError as exc:
         intel.rdap_error = str(exc)
         log.warning("domain_intel.rdap_error", domain=domain, error=str(exc))
+
+    # Cache result even on failure to avoid repeated slow lookups
+    try:
+        r = _get_redis_client()
+        cache_data = {
+            "age_days": intel.age_days,
+            "registrar": intel.registrar,
+            "is_newly_registered": intel.is_newly_registered,
+            "flags": intel.flags,
+        }
+        r.setex(cache_key, 3600, json.dumps(cache_data))  # 1 hour for failed lookups
+        log.info("domain_intel.cached_failure", domain=domain)
+    except Exception as exc:
+        log.warning("domain_intel.redis_cache_error", error=str(exc))
 
     return intel
 
@@ -114,3 +163,10 @@ def extract_domain(url_or_address: str) -> str:
     if "@" in url_or_address:
         return url_or_address.split("@")[-1].strip().strip("<>").lower()
     return url_or_address.strip().lower()
+
+
+def _get_redis_client() -> redis.Redis:
+    """Get Redis client from config."""
+    from app.config import get_settings
+    settings = get_settings()
+    return redis.from_url(settings.redis_url, decode_responses=True)
