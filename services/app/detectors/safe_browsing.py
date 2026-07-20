@@ -29,18 +29,23 @@ def check_url(url: str) -> dict | None:
         log.error("safe_browsing.missing_key", action="check_url", url_hash=url_hash)
         return None
 
-    endpoint = "https://safebrowsing.googleapis.com/v5/urls:search"
-    
-    # Note: Google Safe Browsing v5 specifies 'uri' as the query parameter for the target URL
-    params = {
-        "uri": url,
-        "key": api_key
+    endpoint = f"https://safebrowsing.googleapis.com/v4/threatMatches:find?key={api_key}"
+    payload = {
+        "client": {
+            "clientId": "phishdetect",
+            "clientVersion": "1.0.0"
+        },
+        "threatInfo": {
+            "threatTypes": ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"],
+            "platformTypes": ["ANY_PLATFORM"],
+            "threatEntryTypes": ["URL"],
+            "threatEntries": [{"url": url}]
+        }
     }
-
     try:
         # 4.0s timeout to prevent hanging the pipeline
         with httpx.Client(timeout=4.0) as client:
-            response = client.get(endpoint, params=params)
+            response = client.post(endpoint, json=payload)
             
             if response.status_code != 200:
                 log.error(
@@ -53,18 +58,15 @@ def check_url(url: str) -> dict | None:
                 return None
 
             data = response.json()
-            
             # An empty response ({}) indicates no threats found
-            matches = data.get("threats", [])
+            matches = data.get("matches", [])
             if not matches:
                 log.info("safe_browsing.clean", action="check_url", url_hash=url_hash)
                 return {"flagged": False}
-
-            # In v5 urls:search, each match under 'threats' contains a list of 'threatTypes'
+            # v4 API returns matches with threatType field
             threat_types_set = set()
             for m in matches:
-                for tt in m.get("threatTypes", []):
-                    threat_types_set.add(tt)
+                threat_types_set.add(m.get("threatType", "UNKNOWN"))
             
             threat_types = list(threat_types_set)
             log.info("safe_browsing.flagged", threat_types=threat_types, action="check_url", url_hash=url_hash)

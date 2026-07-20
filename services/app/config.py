@@ -44,9 +44,9 @@ class Settings(BaseSettings):
     default_tenant_id: Optional[str] = None
 
     # ── External probes ───────────────────────────────────────────────────────
-    rdap_timeout: float = 5.0
-    http_probe_timeout: float = 8.0
-    max_redirect_hops: int = 5
+    rdap_timeout: float = 3.0
+    http_probe_timeout: float = 3.0
+    max_redirect_hops: int = 3
 
     # ── Logging ───────────────────────────────────────────────────────────────
     log_level: str = "INFO"
@@ -57,7 +57,6 @@ class Settings(BaseSettings):
 
     # ── External APIs ─────────────────────────────────────────────────────────
     google_safe_browsing_key: Optional[str] = None
-    phishtank_api_key: Optional[str] = None
 
 
 @lru_cache

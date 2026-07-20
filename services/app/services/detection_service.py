@@ -106,6 +106,28 @@ class DetectionService:
                                        weight=self._cfg.weights["url"])
         redirect_final_urls = url_signal.metadata.get("redirect_final_urls", [])
 
+        # ── Brand + URL correlation ───────────────────────────────────────
+        # If header detected brand impersonation, check if any URLs go to the real brand domain
+        brand_ctx = header_signal.metadata.get("brand_impersonation")
+        if brand_ctx:
+            from app.detectors.header import BRAND_DOMAINS
+            claimed_brand = brand_ctx.get("claimed_brand", "")
+            expected_domain = BRAND_DOMAINS.get(claimed_brand, "")
+            if expected_domain:
+                # Check if any URL in email goes to the real brand domain
+                import re
+                all_urls = re.findall(r'https?://[^\s<>"\']+', request.body_text + " " + request.body_html)
+                goes_to_real_domain = any(expected_domain in url for url in all_urls)
+                if not goes_to_real_domain and all_urls:
+                    # Links don't go to the real brand domain — suspicious
+                    url_signal.flags.append(f"brand_url_mismatch:{claimed_brand}(links_not_going_to:{expected_domain})")
+                    url_signal.raw_score = min(url_signal.raw_score + 25.0, 100.0)
+                    url_signal.metadata["brand_url_mismatch"] = {
+                        "claimed_brand": claimed_brand,
+                        "expected_domain": expected_domain,
+                        "urls_found": len(all_urls),
+                    }
+
         def run_qr():
             return self._qr.analyse(request.body_html, weight=self._cfg.weights["qrcode"])
 

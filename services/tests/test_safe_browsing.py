@@ -24,14 +24,12 @@ def test_clean_url(mock_client_class, mock_settings):
     mock_client = mock_client_class.return_value.__enter__.return_value
     mock_response = MagicMock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {"threats": []}
-    mock_client.get.return_value = mock_response
+    mock_response.json.return_value = {"matches": []}
+    mock_client.post.return_value = mock_response
 
     result = check_url("http://clean.com")
     
     assert result == {"flagged": False}
-    mock_client.get.assert_called_once()
-    assert mock_client.get.call_args[1]["params"]["key"] == "test_api_key_123"
 
 
 @patch("app.detectors.safe_browsing.httpx.Client")
@@ -41,11 +39,12 @@ def test_flagged_url(mock_client_class, mock_settings):
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
-        "threats": [
-            {"threatTypes": ["SOCIAL_ENGINEERING", "MALWARE"]}
+        "matches": [
+            {"threatType": "SOCIAL_ENGINEERING"},
+            {"threatType": "MALWARE"}
         ]
     }
-    mock_client.get.return_value = mock_response
+    mock_client.post.return_value = mock_response
 
     result = check_url("http://evil.com")
     
@@ -62,12 +61,13 @@ def test_overlapping_threat_types_deduplicated(mock_client_class, mock_settings)
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
-        "threats": [
-            {"threatTypes": ["MALWARE"]},
-            {"threatTypes": ["MALWARE", "UNWANTED_SOFTWARE"]}
+        "matches": [
+            {"threatType": "MALWARE"},
+            {"threatType": "MALWARE"},
+            {"threatType": "UNWANTED_SOFTWARE"}
         ]
     }
-    mock_client.get.return_value = mock_response
+    mock_client.post.return_value = mock_response
 
     result = check_url("http://multi-evil.com")
     

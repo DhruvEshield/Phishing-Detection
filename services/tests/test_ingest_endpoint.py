@@ -30,7 +30,8 @@ SAMPLE_EMAIL = {
 def test_ingest_returns_score_and_explanation():
     """POST /api/v1/emails/ingest returns risk_score, explanation, routing_decision."""
     with patch("app.services.detection_service._get_classifier", return_value=None), \
-         patch("app.api.ingest.get_db") as mock_db:
+         patch("app.api.ingest.get_db") as mock_db, \
+         patch("app.detectors.feed_ingestor.start_feed_refresh_thread"):
         mock_session = MagicMock()
         mock_db.return_value.__enter__ = MagicMock(return_value=mock_session)
         mock_db.return_value.__exit__ = MagicMock(return_value=False)
