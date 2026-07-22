@@ -27,6 +27,6 @@
     "service_worker": "background.js"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src http://localhost:8000 https://mail.google.com"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src http://localhost:8000 https://mail.google.com https://prospects-tip-expressed-cds.trycloudflare.com"
   }
 }

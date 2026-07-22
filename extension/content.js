@@ -1,5 +1,5 @@
 // PhishDetect Gmail Extension - Content Script
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://prospects-tip-expressed-cds.trycloudflare.com';
 const SIGNAL_LABELS = {
   header: 'Header Analysis',
   content: 'Content Analysis',
