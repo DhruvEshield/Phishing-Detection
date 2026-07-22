@@ -3,8 +3,10 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**', '.claude/**']
   pull_request:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**', '.claude/**']
 
 jobs:
   backend:
@@ -61,10 +63,12 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: ml/requirements-dev.txt
+          cache-dependency-path: ml/requirements-ci.txt
 
       - name: Install Python dependencies
-        run: pip install -r requirements-dev.txt
+        # Minimal set — training-only deps (pandas, datasets) are excluded to keep
+        # CI fast/cheap. See ml/requirements-ci.txt.
+        run: pip install -r requirements-ci.txt
 
       - name: Run tests
         # The shared normalizer (text_normalize.py) and the inference wrapper are

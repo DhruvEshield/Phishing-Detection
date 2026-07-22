@@ -1,0 +1,9 @@
+# Minimal deps for the ML CI job — only what the tests import (text_normalize +
+# the inference wrapper). Training-only heavy deps (pandas, datasets, scipy) are
+# intentionally excluded to keep CI fast and cheap; scipy is pulled transitively
+# by scikit-learn. The full training env lives in requirements.txt.
+scikit-learn==1.6.1
+joblib==1.4.2
+numpy==2.4.6
+structlog==24.4.0
+pytest==8.2.2
