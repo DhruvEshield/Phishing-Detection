@@ -1,0 +1,10 @@
+# ML runtime dependencies — training, evaluation, and the inference wrapper
+# that services/app/detectors/content.py loads. Pin majors to keep the model
+# artifact and the code that loads it on the same scikit-learn ABI.
+scikit-learn==1.6.1
+joblib==1.4.2
+numpy==2.5.0
+scipy==1.18.0
+pandas==3.0.3
+structlog==24.4.0
+datasets==5.0.0
