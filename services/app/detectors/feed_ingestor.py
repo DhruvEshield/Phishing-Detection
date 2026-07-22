@@ -22,7 +22,6 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models.blocklist import BlocklistEntry
-from app.config import get_settings
 
 log = structlog.get_logger()
 
