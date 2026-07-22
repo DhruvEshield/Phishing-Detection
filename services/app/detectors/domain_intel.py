@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
@@ -19,8 +20,52 @@ import httpx
 import structlog
 import json
 import redis
+import tldextract
 
 log = structlog.get_logger()
+
+
+def registered_domain(domain: str) -> str:
+    """Return the registrable domain (eTLD+1) for *domain*, e.g.
+    'email.amazon.co.uk' -> 'amazon.co.uk'. Falls back to the input, lowercased,
+    when extraction yields nothing (bare hostnames, malformed input).
+    """
+    if not domain:
+        return ""
+    ext = tldextract.extract(domain)
+    if ext.domain and ext.suffix:
+        return f"{ext.domain}.{ext.suffix}".lower()
+    return domain.strip().lower()
+
+
+# Common cross-script confusables used in IDN homograph attacks. NFKD does not
+# map these to Latin (different scripts), so they need an explicit table.
+_CONFUSABLES = {
+    # Cyrillic → Latin
+    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x",
+    "і": "i", "ѕ": "s", "ј": "j", "к": "k", "н": "h", "в": "b", "т": "t",
+    "м": "m", "ԁ": "d", "ɡ": "g",
+    # Greek → Latin
+    "ο": "o", "α": "a", "ε": "e", "ρ": "p", "ν": "v", "τ": "t", "υ": "u",
+    "ι": "i", "κ": "k",
+}
+
+
+def normalize_for_homoglyph(domain: str) -> str:
+    """Normalize a domain to expose homoglyph and punycode impersonation.
+    Decodes punycode (xn--...) to unicode, maps common cross-script confusables
+    (Cyrillic/Greek look-alikes) to Latin, then decomposes and strips combining
+    marks so accented look-alikes collapse to their ASCII equivalents.
+    """
+    try:
+        decoded = domain.encode("ascii").decode("idna")
+    except Exception:
+        decoded = domain
+    decoded = decoded.lower()
+    decoded = "".join(_CONFUSABLES.get(c, c) for c in decoded)
+    normalized = unicodedata.normalize("NFKD", decoded)
+    normalized = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+    return normalized
 
 # ── SSRF Guard ────────────────────────────────────────────────────────────────
 _PRIVATE_NETWORKS = [

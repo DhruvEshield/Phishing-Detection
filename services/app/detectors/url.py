@@ -10,14 +10,18 @@ import re
 from urllib.parse import urlparse
 from typing import Optional
 import structlog
-import unicodedata
 import httpx
 import ipaddress
 import tldextract
 from Levenshtein import distance as levenshtein_distance
 
 from app.detectors.base import Signal
-from app.detectors.domain_intel import get_domain_intel, extract_domain, ssrf_guard
+from app.detectors.domain_intel import (
+    get_domain_intel,
+    extract_domain,
+    ssrf_guard,
+    normalize_for_homoglyph,
+)
 from app.config import get_settings
 
 log = structlog.get_logger()
@@ -175,25 +179,10 @@ def _tld_and_shortener_flags(url: str) -> list[str]:
     return flags
 
 
-def _normalize_for_homoglyph(domain: str) -> str:
-    """Normalize domain to detect homoglyph and punycode attacks.
-    Decodes punycode (xn--...) and normalizes unicode characters to ASCII equivalents.
-    """
-    try:
-        # Decode punycode domain to unicode
-        decoded = domain.encode('ascii').decode('idna')
-    except Exception:
-        decoded = domain
-    # Normalize unicode — decompose and strip combining marks
-    normalized = unicodedata.normalize('NFKD', decoded)
-    normalized = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
-    return normalized.lower()
-
-
 def _is_homoglyph_lookalike(domain: str) -> Optional[str]:
     """Check if domain uses homoglyphs or punycode to impersonate a known brand."""
     from app.detectors.header import KNOWN_BRANDS
-    normalized = _normalize_for_homoglyph(domain)
+    normalized = normalize_for_homoglyph(domain)
     domain_root = re.split(r'[.\-]', normalized)[0]
     for brand in KNOWN_BRANDS:
         dist = levenshtein_distance(domain_root, brand)

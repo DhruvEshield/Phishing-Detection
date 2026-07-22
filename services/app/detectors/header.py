@@ -11,7 +11,11 @@ from Levenshtein import distance as levenshtein_distance
 import structlog
 
 from app.detectors.base import Signal
-from app.detectors.domain_intel import extract_domain
+from app.detectors.domain_intel import (
+    extract_domain,
+    registered_domain,
+    normalize_for_homoglyph,
+)
 
 log = structlog.get_logger()
 
@@ -73,20 +77,70 @@ def _dmarc_result(headers: dict[str, str]) -> Optional[str]:
     return m.group(1).lower() if m else None
 
 
+def _extract_dkim_domain(headers: dict[str, str]) -> Optional[str]:
+    """The domain a passing DKIM signature authenticated (the `d=` / header.d=
+    value in Authentication-Results). None when absent.
+    """
+    auth = headers.get("Authentication-Results", "")
+    m = re.search(r"header\.d=([A-Za-z0-9.\-]+)", auth, re.IGNORECASE)
+    if not m:
+        m = re.search(r"\bd=([A-Za-z0-9.\-]+)", auth, re.IGNORECASE)
+    return m.group(1).lower() if m else None
+
+
+def _extract_spf_domain(headers: dict[str, str]) -> Optional[str]:
+    """The domain SPF authenticated (envelope-from / Return-Path). None when
+    undeterminable. Priority: smtp.mailfrom= in Authentication-Results →
+    Return-Path header → 'domain of X' phrase in Received-SPF.
+    """
+    auth = headers.get("Authentication-Results", "")
+    m = re.search(r"smtp\.mailfrom=([A-Za-z0-9.@\-]+)", auth, re.IGNORECASE)
+    if m:
+        return extract_domain(m.group(1))
+
+    return_path = headers.get("Return-Path", "")
+    if return_path:
+        dom = extract_domain(return_path.strip().strip("<>"))
+        if dom:
+            return dom
+
+    received_spf = headers.get("Received-SPF", "")
+    m = re.search(r"domain of\s+([A-Za-z0-9.@\-]+)", received_spf, re.IGNORECASE)
+    if m:
+        return extract_domain(m.group(1))
+    return None
+
+
 class HeaderAnalyzer:
     """
     Analyses email headers and returns a Signal with a raw_score 0–100.
     Each sub-check contributes a fixed amount; flags document what fired.
     """
 
-    # Sub-check contributions (sum of all = 100 worst-case)
-    _SPF_FAIL = 20
-    _DKIM_FAIL = 20
-    _DMARC_FAIL = 15
+    # Graduated auth penalties — explicit reject > inconclusive > couldn't-check.
+    # `pass` scores 0; unknown non-pass values fall back to the inconclusive bucket.
+    _SPF_PENALTY = {"fail": 20, "softfail": 12, "none": 8, "neutral": 8, None: 4}
+    _DKIM_PENALTY = {"fail": 20, "none": 8, None: 4}
+    _DMARC_PENALTY = {"fail": 15, "none": 8, None: 4}
+
+    # A green SPF/DKIM that authenticated a DIFFERENT domain than From — the
+    # spoof that "reads a word" checks miss entirely.
+    _AUTH_UNALIGNED = 30
+
     _REPLY_TO_MISMATCH = 20
     _LOOKALIKE_DISPLAY = 25
     _EXACT_BRAND_IMPERSONATION = 30
     _BRAND_IMPERSONATION_MISMATCH = 35
+
+    @classmethod
+    def _auth_penalty(cls, result: Optional[str], table: dict) -> float:
+        """Graduated penalty for an auth result. `pass` -> 0; known bad/uncertain
+        values use the table; unknown non-pass values -> inconclusive bucket."""
+        if result == "pass":
+            return 0.0
+        if result in table:
+            return table[result]
+        return table.get("none", 8)
 
     def analyse(self, headers: dict[str, str], weight: float) -> Signal:
         score = 0.0
@@ -98,26 +152,64 @@ class HeaderAnalyzer:
         display_name, sender_email = _parse_display_name(from_header)
         sender_domain = extract_domain(sender_email)
 
-        # ── SPF ──────────────────────────────────────────────────────────────
+        # ── SPF / DKIM / DMARC — graduated (fail > inconclusive > absent) ────
         spf = _spf_result(headers)
         meta["spf"] = spf
-        if spf in ("fail", "softfail", "none", None):
-            score += self._SPF_FAIL
+        if spf != "pass":
+            score += self._auth_penalty(spf, self._SPF_PENALTY)
             flags.append(f"spf_{spf or 'missing'}")
 
-        # ── DKIM ─────────────────────────────────────────────────────────────
         dkim = _dkim_result(headers)
         meta["dkim"] = dkim
-        if dkim in ("fail", "none", None):
-            score += self._DKIM_FAIL
+        if dkim != "pass":
+            score += self._auth_penalty(dkim, self._DKIM_PENALTY)
             flags.append(f"dkim_{dkim or 'missing'}")
 
-        # ── DMARC ────────────────────────────────────────────────────────────
         dmarc = _dmarc_result(headers)
         meta["dmarc"] = dmarc
-        if dmarc in ("fail", "none", None):
-            score += self._DMARC_FAIL
+        if dmarc != "pass":
+            score += self._auth_penalty(dmarc, self._DMARC_PENALTY)
             flags.append(f"dmarc_{dmarc or 'missing'}")
+
+        # ── Alignment — does a PASSING auth actually cover the From domain? ───
+        # DMARC pass inherently means aligned. Otherwise, extract the domains SPF
+        # and DKIM authenticated and compare (relaxed / eTLD+1) against From.
+        from_reg = registered_domain(sender_domain)
+        dkim_domain = _extract_dkim_domain(headers)
+        spf_domain = _extract_spf_domain(headers)
+        dkim_aligned = (
+            dkim == "pass" and dkim_domain is not None
+            and registered_domain(dkim_domain) == from_reg
+        )
+        spf_aligned = (
+            spf == "pass" and spf_domain is not None
+            and registered_domain(spf_domain) == from_reg
+        )
+        auth_passed = spf == "pass" or dkim == "pass"
+        auth_domain_known = bool(
+            (dkim == "pass" and dkim_domain) or (spf == "pass" and spf_domain)
+        )
+
+        if dmarc == "pass" or dkim_aligned or spf_aligned:
+            # Verified as genuinely from the From domain — a positive trust marker.
+            flags.append("fully_authenticated")
+            meta["auth_alignment"] = {"aligned": True, "from_domain": from_reg}
+        elif auth_passed and auth_domain_known:
+            auth_domains = ",".join(
+                d for d in (
+                    dkim_domain if dkim == "pass" else None,
+                    spf_domain if spf == "pass" else None,
+                ) if d
+            )
+            score += self._AUTH_UNALIGNED
+            flags.append(f"auth_pass_but_unaligned:{auth_domains}!={from_reg}")
+            meta["auth_alignment"] = {
+                "aligned": False, "auth_domains": auth_domains, "from_domain": from_reg,
+            }
+        elif auth_passed:
+            # Passed, but we couldn't determine what it authenticated — inform, don't penalize.
+            flags.append("alignment_unverifiable")
+            meta["auth_alignment"] = {"aligned": None, "from_domain": from_reg}
 
         # ── Reply-To mismatch ────────────────────────────────────────────────
         if reply_to:
@@ -155,6 +247,21 @@ class HeaderAnalyzer:
                     flags.append(f"lookalike_sender_domain:{sender_domain}~={brand}(dist={dist})")
                     meta["lookalike_domain"] = sender_domain
                     break
+
+        # ── Homoglyph / punycode sender domain ───────────────────────────────
+        # Cross-script look-alikes (Cyrillic/Greek) and punycode collapse to a
+        # brand after normalization while the raw domain does not — pure spoof.
+        if sender_domain:
+            sender_norm = normalize_for_homoglyph(sender_domain)
+            norm_root = re.split(r'[.\-]', sender_norm)[0]
+            orig_root = re.split(r'[.\-]', sender_domain)[0].lower()
+            if norm_root != orig_root:
+                for brand in KNOWN_BRANDS:
+                    if norm_root == brand:
+                        score += self._LOOKALIKE_DISPLAY
+                        flags.append(f"homoglyph_sender_domain:{sender_domain}~={brand}")
+                        meta["homoglyph_domain"] = sender_domain
+                        break
 
         # ── Brand impersonation — display name claims brand but sender domain doesn't match ───
         if display_name and sender_domain:
