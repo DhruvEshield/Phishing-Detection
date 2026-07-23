@@ -23,6 +23,7 @@ from app.scoring.engine import ScoringEngine
 from app.models.email import Email
 from app.models.analysis import AnalysisResult
 from app.models.queue_entry import QueueEntry
+from app.scoring.severity_map import get_flag_severity
 
 log = structlog.get_logger()
 
@@ -154,6 +155,7 @@ class DetectionService:
 
         # ── Score ─────────────────────────────────────────────────────────────
         result = self._engine.compute(list(signals))
+        issues = self._build_issues_list(signals)
 
         # ── Persist ───────────────────────────────────────────────────────────
         from_header = request.headers.get("From", "")
@@ -177,7 +179,8 @@ class DetectionService:
             risk_tier=result.risk_tier,
             verdict=result.verdict,
             explanation_json={"signals": result.explanation,
-                              "model_version": settings.model_version},
+                              "model_version": settings.model_version,
+                              "issues": issues},
             model_version=settings.model_version,
             tenant_id=request.tenant_id,
         )
@@ -202,6 +205,25 @@ class DetectionService:
         )
 
         return self._build_response(email, ar)
+
+    def _build_issues_list(self, signals: list) -> list[dict]:
+        """Build a severity-graded issues list from all detector signals,
+        sorted from most to least severe. Each entry: {detector, flag, severity}.
+        Flags with no severity (excluded/unmapped) are skipped."""
+        _SEVERITY_ORDER = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
+        issues = []
+        for signal in signals:
+            for flag in signal.flags:
+                severity = get_flag_severity(flag)
+                if severity is None:
+                    continue
+                issues.append({
+                    "detector": signal.name,
+                    "flag": flag,
+                    "severity": severity,
+                })
+        issues.sort(key=lambda i: _SEVERITY_ORDER.get(i["severity"], 99))
+        return issues
 
     def _build_response(self, email: Email, ar: AnalysisResult) -> EmailAnalysisResponse:
         settings = get_settings()
