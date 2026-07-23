@@ -34,6 +34,7 @@ SEVERITY_MAP: dict[str, str] = {
     "blocklist_hit": CRITICAL,
     "dangerous_extension": CRITICAL,
     "double_extension": CRITICAL,
+    "brand_url_mismatch": CRITICAL,
     
     "auth_pass_but_unaligned": HIGH,
     "lookalike_sender_domain": HIGH,
