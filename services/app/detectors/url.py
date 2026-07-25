@@ -49,6 +49,71 @@ URL_SHORTENER_DOMAINS = {
 _URL_PATTERN = re.compile(r'https?://[^\s<>"\']+', re.IGNORECASE)
 
 
+def _extract_anchor_pairs(body_html: str) -> list[dict]:
+    """Extract <a href="...">text</a> pairs for anchor-text-vs-href mismatch detection.
+    Step 1: Extraction only (no comparison/flagging logic).
+    """
+    pairs = []
+    try:
+        # Match <a> tags with href attributes and capture their inner content.
+        anchor_regex = re.compile(r'<a\s+[^>]*?href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', re.IGNORECASE | re.DOTALL)
+        tag_stripper = re.compile(r'<[^>]+>')
+        
+        matches = anchor_regex.findall(body_html)
+        for href, inner_html in matches[:20]:
+            # Strip nested tags like <b> or <span>
+            anchor_text = tag_stripper.sub('', inner_html)
+            # Normalize whitespace
+            anchor_text = " ".join(anchor_text.split()).strip()
+            
+            if anchor_text:
+                pairs.append({"href": href, "anchor_text": anchor_text})
+                
+    except Exception as exc:
+        log.warning("url.extract_anchor_pairs_error", error=str(exc))
+        
+    return pairs
+
+
+def _check_anchor_mismatch(pairs: list[dict]) -> list[str]:
+    """Check extracted anchor pairs for anchor-text-vs-href mismatches.
+    Step 2: Takes extracted pairs and returns suspicion flags.
+    No HTML parsing here.
+    """
+    from app.detectors.header import BRAND_DOMAINS
+    flags = []
+    try:
+        domain_shape_re = re.compile(r'([a-z0-9-]+\.[a-z]{2,})')
+        
+        for pair in pairs:
+            anchor_text = pair.get("anchor_text", "").lower()
+            href = pair.get("href", "")
+            if not anchor_text or not href:
+                continue
+                
+            href_domain = extract_domain(href)
+            if not href_domain:
+                continue
+                
+            # Case A: anchor text names a brand, href doesn't match
+            for brand, expected_domain in BRAND_DOMAINS.items():
+                if re.search(rf'\b{re.escape(brand)}\b', anchor_text):
+                    if not href_domain.endswith(expected_domain):
+                        flags.append(f"anchor_brand_mismatch:{brand}(text_claims:{brand},href_domain:{href_domain})")
+                    
+            # Case B: anchor text itself looks like a URL/domain
+            domain_match = domain_shape_re.search(anchor_text)
+            if domain_match:
+                text_domain = extract_domain(domain_match.group(1))
+                if text_domain and text_domain != href_domain:
+                    flags.append(f"anchor_text_href_mismatch:{text_domain}!={href_domain}")
+                    
+    except Exception as exc:
+        log.warning("url.check_anchor_mismatch_error", error=str(exc))
+        
+    return flags
+
+
 def _extract_urls(body_text: str, body_html: str) -> list[str]:
     return list(set(_URL_PATTERN.findall(body_text + " " + body_html)))
 
