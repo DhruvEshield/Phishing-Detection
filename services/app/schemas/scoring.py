@@ -29,6 +29,9 @@ class ScoreExplanation(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     signals: list[SignalBreakdown]
+    # Severity-graded issues list (each entry has detector, flag, severity keys),
+    # separate from the raw per-detector signals breakdown.
+    issues: list[dict] = Field(default_factory=list)
     model_version: str
 
 

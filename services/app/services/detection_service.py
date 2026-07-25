@@ -236,6 +236,7 @@ class DetectionService:
             routing_decision=email.routing_decision,
             explanation=ScoreExplanation(
                 signals=exp_data.get("signals", []),
+                issues=exp_data.get("issues", []),
                 model_version=exp_data.get("model_version", settings.model_version),
             ),
             analysed_at=ar.created_at,
