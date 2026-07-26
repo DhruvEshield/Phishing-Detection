@@ -36,6 +36,7 @@ SEVERITY_MAP: dict[str, str] = {
     "double_extension": CRITICAL,
     "brand_url_mismatch": CRITICAL,
     "dnstwist_brand_match": CRITICAL,
+    "dnstwist_match_newly_registered": CRITICAL,
     "anchor_brand_mismatch": CRITICAL,
     "anchor_text_href_mismatch": CRITICAL,
     

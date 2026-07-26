@@ -17,6 +17,7 @@ from app.detectors.domain_intel import (
     normalize_for_homoglyph,
 )
 from app.detectors.brand_intel import check_domain_against_brands
+from app.detectors.nrd_feed import is_newly_registered_domain
 
 log = structlog.get_logger()
 
@@ -292,6 +293,10 @@ class HeaderAnalyzer:
                     "permutation_type": brand_match.permutation_type,
                     "matched_domain": brand_match.matched_domain,
                 }
+                if brand_match and is_newly_registered_domain(sender_domain):
+                    score += self._BRAND_IMPERSONATION_MISMATCH
+                    flags.append(f"dnstwist_match_newly_registered:{brand_match.matched_brand}")
+                    meta["dnstwist_match_newly_registered"] = True
 
         # ── Brand impersonation — display name claims brand but sender domain doesn't match ───
         if display_name and sender_domain:

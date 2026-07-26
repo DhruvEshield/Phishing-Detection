@@ -113,3 +113,23 @@ def test_anchor_brand_mismatch_detected():
     signal = analyzer.analyse(body_text="", body_html=body_html, weight=0.25)
     assert any("anchor_brand_mismatch" in f for f in signal.flags)
     assert signal.raw_score > 0
+
+from unittest.mock import patch
+from app.detectors.brand_intel import BrandMatch
+
+@patch("app.detectors.url.check_domain_against_brands")
+@patch("app.detectors.url.is_newly_registered_domain")
+def test_dnstwist_newly_registered_detected(mock_nrd, mock_dnstwist):
+    """Dnstwist match + NRD yields dnstwist_match_newly_registered in URL flags."""
+    mock_dnstwist.return_value = BrandMatch("amazon-security.com", "amazon", "addition", "amazon-security.com")
+    mock_nrd.return_value = True
+    
+    analyzer = URLAnalyzer()
+    signal = analyzer.analyse(
+        body_text="Click here: https://amazon-security.com",
+        body_html="",
+        weight=0.25,
+    )
+    
+    assert any("dnstwist_match_newly_registered:amazon" in f for f in signal.flags)
+    assert signal.raw_score > 0

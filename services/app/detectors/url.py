@@ -23,6 +23,7 @@ from app.detectors.domain_intel import (
     normalize_for_homoglyph,
 )
 from app.detectors.brand_intel import check_domain_against_brands
+from app.detectors.nrd_feed import is_newly_registered_domain
 from app.config import get_settings
 
 log = structlog.get_logger()
@@ -331,6 +332,9 @@ class URLAnalyzer:
                     f"dnstwist_brand_match:{brand_match.matched_brand}"
                     f"(type:{brand_match.permutation_type})"
                 )
+                if brand_match and is_newly_registered_domain(domain):
+                    score += 35
+                    url_flags.append(f"dnstwist_match_newly_registered:{brand_match.matched_brand}")
 
             # ── URL structure red flags ────────────────────────────────────
             structure_flags = _url_structure_red_flags(url)

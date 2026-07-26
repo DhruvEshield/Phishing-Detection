@@ -23,6 +23,7 @@ from app.scoring.engine import ScoringEngine
 from app.models.email import Email
 from app.models.analysis import AnalysisResult
 from app.models.queue_entry import QueueEntry
+from app.models.sender_history import SenderHistory
 from app.scoring.severity_map import get_flag_severity
 
 log = structlog.get_logger()
@@ -190,6 +191,8 @@ class DetectionService:
         if result.routing_decision == "review":
             self._db.add(QueueEntry(email_id=email.id, tenant_id=request.tenant_id))
 
+        self._record_sender_history(from_header, request.tenant_id)
+
         self._db.commit()
         self._db.refresh(email)
 
@@ -205,6 +208,37 @@ class DetectionService:
         )
 
         return self._build_response(email, ar)
+
+    def _record_sender_history(self, sender: str, tenant_id: str | None) -> None:
+        """Upsert a SenderHistory row — tracks first/last seen and count per
+        sender. Groundwork for future first-time-sender / BEC detection;
+        no detection logic reads this yet."""
+        if not sender:
+            return
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        try:
+            existing = (
+                self._db.query(SenderHistory)
+                .filter(
+                    SenderHistory.sender == sender,
+                    SenderHistory.tenant_id == tenant_id,
+                )
+                .first()
+            )
+            if existing:
+                existing.last_seen_at = now
+                existing.email_count += 1
+            else:
+                self._db.add(SenderHistory(
+                    sender=sender,
+                    tenant_id=tenant_id,
+                    first_seen_at=now,
+                    last_seen_at=now,
+                    email_count=1,
+                ))
+        except Exception as exc:
+            log.warning("detection.sender_history_error", error=str(exc), sender=sender)
 
     def _build_issues_list(self, signals: list) -> list[dict]:
         """Build a severity-graded issues list from all detector signals,

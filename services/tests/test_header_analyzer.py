@@ -178,3 +178,22 @@ def test_return_path_mismatch_detected():
     signal = analyzer.analyse(headers, weight=0.20)
     assert any("return_path_mismatch" in f for f in signal.flags)
     assert signal.raw_score > 0
+
+from unittest.mock import patch
+from app.detectors.brand_intel import BrandMatch
+
+@patch("app.detectors.header.check_domain_against_brands")
+@patch("app.detectors.header.is_newly_registered_domain")
+def test_dnstwist_newly_registered_detected(mock_nrd, mock_dnstwist):
+    """Dnstwist match + NRD yields dnstwist_match_newly_registered."""
+    mock_dnstwist.return_value = BrandMatch("amazon-security.com", "amazon", "addition", "amazon-security.com")
+    mock_nrd.return_value = True
+    
+    headers = {
+        "From": "Support <support@amazon-security.com>",
+    }
+    analyzer = HeaderAnalyzer()
+    signal = analyzer.analyse(headers, weight=0.25)
+    
+    assert any("dnstwist_match_newly_registered:amazon" in f for f in signal.flags)
+    assert signal.raw_score > 0
