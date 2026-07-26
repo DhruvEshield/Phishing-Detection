@@ -3,7 +3,7 @@
 # artifact and the code that loads it on the same scikit-learn ABI.
 scikit-learn==1.6.1
 joblib==1.4.2
-numpy==2.5.0
+numpy==2.4.6
 scipy==1.18.0
 pandas==3.0.3
 structlog==24.4.0
