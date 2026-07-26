@@ -52,6 +52,7 @@ SEVERITY_MAP: dict[str, str] = {
     
     "lookalike_display": MEDIUM,
     "reply_to_mismatch": MEDIUM,
+    "return_path_mismatch": MEDIUM,
     "authority_impersonation": MEDIUM,
     "credential_request": MEDIUM,
     "raw_ip_host": MEDIUM,

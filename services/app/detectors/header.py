@@ -220,6 +220,18 @@ class HeaderAnalyzer:
                 flags.append(f"reply_to_mismatch:{reply_domain}!={sender_domain}")
                 meta["reply_to_domain"] = reply_domain
 
+        # ── Return-Path domain mismatch ─────────────────────────────────
+        # A legitimate sender's bounce address (Return-Path) domain should match
+        # the From domain. A mismatch here is a cross-header inconsistency that
+        # existing checks (which only look at Reply-To, or SPF/DKIM alignment) miss.
+        return_path = headers.get("Return-Path", "")
+        if return_path:
+            return_path_domain = extract_domain(return_path.strip().strip("<>"))
+            if return_path_domain and return_path_domain != sender_domain:
+                score += self._REPLY_TO_MISMATCH
+                flags.append(f"return_path_mismatch:{return_path_domain}!={sender_domain}")
+                meta["return_path_domain"] = return_path_domain
+
         # ── Lookalike display name ───────────────────────────────────────────
         if display_name:
             for word in display_name.split():

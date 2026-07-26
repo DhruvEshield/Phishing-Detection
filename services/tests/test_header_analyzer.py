@@ -166,3 +166,15 @@ def test_homoglyph_sender_domain_detected():
     signal = analyzer.analyse(headers, weight=0.25)
     assert any("homoglyph_sender_domain" in f for f in signal.flags), \
         f"Expected homoglyph flag, got: {signal.flags}"
+
+
+def test_return_path_mismatch_detected():
+    """Return-Path domain differing from From domain should be flagged."""
+    headers = {
+        "From": "Alice <alice@legit-company.com>",
+        "Return-Path": "<bounce@evil-domain.com>",
+    }
+    analyzer = HeaderAnalyzer()
+    signal = analyzer.analyse(headers, weight=0.20)
+    assert any("return_path_mismatch" in f for f in signal.flags)
+    assert signal.raw_score > 0
