@@ -288,6 +288,13 @@ class URLAnalyzer:
         meta["url_count"] = len(urls)
         suspicious_urls = []
 
+        anchor_pairs = _extract_anchor_pairs(body_html)
+        anchor_mismatch_flags = _check_anchor_mismatch(anchor_pairs)
+        meta["anchor_pairs_checked"] = len(anchor_pairs)
+        if anchor_mismatch_flags:
+            flags.extend(anchor_mismatch_flags)
+            score += 25 * len(anchor_mismatch_flags)
+
         domain_cache: dict[str, object] = {}
         for url in urls[:10]:  # cap at 10 to bound latency
             domain = extract_domain(url)

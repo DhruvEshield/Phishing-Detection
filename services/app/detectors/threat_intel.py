@@ -53,7 +53,7 @@ class LocalBlocklistAdapter(ThreatIntelProvider):
 
 class ExternalFeedAdapter(ThreatIntelProvider):
     """
-    Phase 1 implementation for an external threat intel feed using Google Safe Browsing.
+    Phase 1 implementation for an external threat intel feed using Google Web Risk.
     Persists confirmed hits to the local blocklist.
     """
     def __init__(self, db: Session):
@@ -61,10 +61,10 @@ class ExternalFeedAdapter(ThreatIntelProvider):
 
     def is_blocked(self, indicator: str, indicator_type: str) -> tuple[bool, Optional[str]]:
         from datetime import datetime, timedelta, timezone
-        from app.detectors.safe_browsing import check_url
+        from app.detectors.web_risk import check_url
         from app.models.blocklist import BlocklistEntry
         
-        # Prepare URL for Safe Browsing. If bare domain, prepend scheme and append trailing slash.
+        # Prepare URL for Web Risk. If bare domain, prepend scheme and append trailing slash.
         check_target = indicator
         if indicator_type == "domain":
             check_target = f"https://{indicator}/"
@@ -73,7 +73,7 @@ class ExternalFeedAdapter(ThreatIntelProvider):
         
         if result is None:
             # Network error, timeout, or missing key -> fail open and log warning
-            log.warning("threat_intel.safe_browsing.failed", indicator=indicator, indicator_type=indicator_type)
+            log.warning("threat_intel.web_risk.failed", indicator=indicator, indicator_type=indicator_type)
             return False, None
             
         if not result.get("flagged"):
@@ -95,28 +95,28 @@ class ExternalFeedAdapter(ThreatIntelProvider):
             # Option (a): Update existing row to a fresh 30 days.
             # This prevents stale database bloat while keeping the entry active.
             existing.expires_at = now + timedelta(days=30)
-            existing.source = "safe_browsing"
+            existing.source = "web_risk"
             try:
                 self._db.commit()
             except Exception as e:
                 self._db.rollback()
-                log.error("threat_intel.safe_browsing.db_update_error", error=str(e), indicator=indicator)
+                log.error("threat_intel.web_risk.db_update_error", error=str(e), indicator=indicator)
         else:
             new_entry = BlocklistEntry(
                 indicator=indicator.lower(),
                 indicator_type=indicator_type,
-                source="safe_browsing",
+                source="web_risk",
                 expires_at=now + timedelta(days=30)
             )
             self._db.add(new_entry)
             try:
                 self._db.commit()
-                log.info("threat_intel.safe_browsing.persisted", indicator=indicator, indicator_type=indicator_type)
+                log.info("threat_intel.web_risk.persisted", indicator=indicator, indicator_type=indicator_type)
             except Exception as e:
                 self._db.rollback()
-                log.error("threat_intel.safe_browsing.db_error", error=str(e), indicator=indicator)
+                log.error("threat_intel.web_risk.db_error", error=str(e), indicator=indicator)
                 
-        return True, "safe_browsing"
+        return True, "web_risk"
 
 
 class ChainedThreatIntelProvider(ThreatIntelProvider):

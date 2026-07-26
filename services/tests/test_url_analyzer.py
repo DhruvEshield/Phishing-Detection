@@ -104,3 +104,12 @@ def test_excessive_subdomains_detected():
     )
     assert any("excessive_subdomains" in f for f in signal.flags), \
         f"Excessive subdomains should be flagged but got: {signal.flags}"
+
+
+def test_anchor_brand_mismatch_detected():
+    """Anchor text claiming a brand but linking elsewhere should be flagged."""
+    analyzer = URLAnalyzer()
+    body_html = '<a href="https://evil.com/login">Login to Amazon</a>'
+    signal = analyzer.analyse(body_text="", body_html=body_html, weight=0.25)
+    assert any("anchor_brand_mismatch" in f for f in signal.flags)
+    assert signal.raw_score > 0
