@@ -4,6 +4,17 @@
 target-version = "py311"
 
 [lint]
+# Pin the rule set explicitly. Without `select`, ruff applies its *default* rules,
+# which change between releases — 0.16.0 widened the defaults and turned a green
+# build into 177 errors across untouched files. CI pins the ruff version too
+# (.github/workflows/ci.yml); this makes the rule set version-independent.
+select = ["E4", "E7", "E9", "F"]
+
+# TODO(lint-cleanup): BLE001 (36 hits) and S110 (6 hits) are worth enabling —
+# this codebase parses hostile email, and blanket `except Exception` /
+# `try-except-pass` is exactly how a detector silently fails open. Enable them
+# in a dedicated cleanup PR alongside the fixes, not in a feature branch.
+
 # F821: SQLAlchemy uses string forward references in Mapped["TypeName"]
 # which ruff incorrectly flags as "Undefined name".
 # We suppress F821 only in the models directory via per-file-ignores.
