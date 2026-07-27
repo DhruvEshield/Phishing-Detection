@@ -7,8 +7,10 @@ combine with lookalike/brand-match detection later.
 """
 from __future__ import annotations
 
+import base64
 import io
 import time
+import uuid
 import zipfile
 from datetime import datetime, timedelta, timezone
 from threading import Thread
@@ -24,6 +26,11 @@ _HEADERS = {
     "User-Agent": "PhishDetect-Bot/1.0",
 }
 
+# Fixed name of the .txt member inside the WhoisDS daily archive.
+_ARCHIVE_MEMBER = "domain-names.txt"
+
+_CACHE_KEY = "nrd:current"
+
 
 def _fetch_nrd_feed() -> list[str]:
     """
@@ -35,21 +42,34 @@ def _fetch_nrd_feed() -> list[str]:
         # WhoisDS publishes data with a 2-day lag
         target_date = datetime.now(timezone.utc) - timedelta(days=2)
         date_str = target_date.strftime("%Y-%m-%d")
-        url = f"https://whoisds.com/whois-database/newly-registered-domains/{date_str}.zip/nrd"
-        
+        # WhoisDS base64-encodes '<date>.zip' into the path segment. The plain
+        # '<date>.zip' path is not a 404 — it returns 200 with an empty body,
+        # so getting this wrong fails *open* (no NRD ever matches) rather than
+        # raising. Asserted by test_fetch_nrd_feed_requests_encoded_url.
+        encoded_filename = base64.b64encode(f"{date_str}.zip".encode()).decode()
+        url = (
+            "https://www.whoisds.com/whois-database/newly-registered-domains/"
+            f"{encoded_filename}/nrd"
+        )
+
         with httpx.Client(timeout=30.0, headers=_HEADERS) as client:
             response = client.get(url)
             if response.status_code != 200:
                 log.warning("nrd_feed.fetch_failed", status_code=response.status_code, url=url)
                 return []
             
-            # Extract zip in memory
+            # Extract zip in memory. The archive member has a fixed name —
+            # 'domain-names.txt', not '<date>.txt' (verified against the live
+            # feed). Fall back to a sole .txt member if the provider renames it.
             with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-                txt_filename = f"{date_str}.txt"
+                txt_filename = _ARCHIVE_MEMBER
                 if txt_filename not in z.namelist():
-                    log.warning("nrd_feed.missing_txt_file", filename=txt_filename, contents=z.namelist())
-                    return []
-                    
+                    candidates = [n for n in z.namelist() if n.endswith(".txt")]
+                    if len(candidates) != 1:
+                        log.warning("nrd_feed.missing_txt_file", filename=txt_filename, contents=z.namelist())
+                        return []
+                    txt_filename = candidates[0]
+
                 with z.open(txt_filename) as f:
                     domains = []
                     for line in f:
@@ -76,16 +96,24 @@ def refresh_nrd_cache() -> int:
     try:
         settings = get_settings()
         r = redis.from_url(settings.redis_url, decode_responses=True)
-        key = "nrd:current"
-        
-        # Batch sadd to avoid one giant command
-        batch_size = 1000
-        for i in range(0, len(domains), batch_size):
-            batch = domains[i:i + batch_size]
-            r.sadd(key, *batch)
-            
-        r.expire(key, 48 * 3600)  # 48 hours
-        
+
+        # Build into a temp key and RENAME over the live one. Adding straight
+        # into 'nrd:current' only ever *grows* the set — domains from every
+        # prior refresh would linger until the TTL happened to lapse, and each
+        # refresh resets that TTL, so in practice they never expire.
+        build_key = f"nrd:build:{uuid.uuid4().hex}"
+        try:
+            batch_size = 1000
+            for i in range(0, len(domains), batch_size):
+                r.sadd(build_key, *domains[i:i + batch_size])
+
+            r.expire(build_key, 48 * 3600)  # 48 hours
+            # RENAME is atomic: readers see the old set until it swaps.
+            r.rename(build_key, _CACHE_KEY)
+        except Exception:
+            r.delete(build_key)
+            raise
+
         log.info("nrd_feed.refreshed", count=len(domains))
         return len(domains)
     except Exception as e:
@@ -101,7 +129,7 @@ def is_newly_registered_domain(domain: str) -> bool:
     try:
         settings = get_settings()
         r = redis.from_url(settings.redis_url, decode_responses=True)
-        return bool(r.sismember("nrd:current", domain.lower()))
+        return bool(r.sismember(_CACHE_KEY, domain.lower()))
     except Exception as e:
         log.warning("nrd_feed.check_error", error=str(e), domain=domain)
         return False
