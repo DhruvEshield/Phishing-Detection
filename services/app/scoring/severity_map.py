@@ -36,6 +36,9 @@ SEVERITY_MAP: dict[str, str] = {
     "double_extension": CRITICAL,
     "brand_url_mismatch": CRITICAL,
     "dnstwist_brand_match": CRITICAL,
+    "dnstwist_match_newly_registered": CRITICAL,
+    "anchor_brand_mismatch": CRITICAL,
+    "anchor_text_href_mismatch": CRITICAL,
     
     "auth_pass_but_unaligned": HIGH,
     "lookalike_sender_domain": HIGH,
@@ -50,6 +53,7 @@ SEVERITY_MAP: dict[str, str] = {
     
     "lookalike_display": MEDIUM,
     "reply_to_mismatch": MEDIUM,
+    "return_path_mismatch": MEDIUM,
     "authority_impersonation": MEDIUM,
     "credential_request": MEDIUM,
     "raw_ip_host": MEDIUM,

@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from app.detectors.url import URLAnalyzer, _is_lookalike, _credential_harvest_heuristic
 from app.detectors.domain_intel import DomainIntel
+from app.detectors.brand_intel import BrandMatch
 
 
 def _mock_intel(is_newly_registered=False, age_days=365):
@@ -104,3 +105,50 @@ def test_excessive_subdomains_detected():
     )
     assert any("excessive_subdomains" in f for f in signal.flags), \
         f"Excessive subdomains should be flagged but got: {signal.flags}"
+
+
+def test_anchor_brand_mismatch_detected():
+    """Anchor text claiming a brand but linking elsewhere should be flagged."""
+    analyzer = URLAnalyzer()
+    body_html = '<a href="https://evil.com/login">Login to Amazon</a>'
+    signal = analyzer.analyse(body_text="", body_html=body_html, weight=0.25)
+    assert any("anchor_brand_mismatch" in f for f in signal.flags)
+    assert signal.raw_score > 0
+
+
+def test_anchor_brand_mismatch_lookalike_suffix():
+    """A lookalike that merely *ends with* the brand domain must still be
+    flagged. 'evilamazon.com'.endswith('amazon.com') is True, so a naive
+    suffix check lets the phish through."""
+    analyzer = URLAnalyzer()
+    body_html = '<a href="https://evilamazon.com/login">Login to Amazon</a>'
+    signal = analyzer.analyse(body_text="", body_html=body_html, weight=0.25)
+    assert any("anchor_brand_mismatch" in f for f in signal.flags)
+
+
+def test_anchor_brand_legitimate_subdomain_not_flagged():
+    """Guard against over-correcting: a real brand subdomain must not flag."""
+    analyzer = URLAnalyzer()
+    for href in ("https://amazon.com/orders", "https://www.amazon.com/orders"):
+        signal = analyzer.analyse(
+            body_text="", body_html=f'<a href="{href}">Login to Amazon</a>', weight=0.25,
+        )
+        assert not any("anchor_brand_mismatch" in f for f in signal.flags), href
+
+
+@patch("app.detectors.url.check_domain_against_brands")
+@patch("app.detectors.url.is_newly_registered_domain")
+def test_dnstwist_newly_registered_detected(mock_nrd, mock_dnstwist):
+    """Dnstwist match + NRD yields dnstwist_match_newly_registered in URL flags."""
+    mock_dnstwist.return_value = BrandMatch("amazon-security.com", "amazon", "addition", "amazon-security.com")
+    mock_nrd.return_value = True
+    
+    analyzer = URLAnalyzer()
+    signal = analyzer.analyse(
+        body_text="Click here: https://amazon-security.com",
+        body_html="",
+        weight=0.25,
+    )
+    
+    assert any("dnstwist_match_newly_registered:amazon" in f for f in signal.flags)
+    assert signal.raw_score > 0

@@ -21,8 +21,10 @@ from app.detectors.domain_intel import (
     extract_domain,
     ssrf_guard,
     normalize_for_homoglyph,
+    domain_matches,
 )
 from app.detectors.brand_intel import check_domain_against_brands
+from app.detectors.nrd_feed import is_newly_registered_domain
 from app.config import get_settings
 
 log = structlog.get_logger()
@@ -98,7 +100,7 @@ def _check_anchor_mismatch(pairs: list[dict]) -> list[str]:
             # Case A: anchor text names a brand, href doesn't match
             for brand, expected_domain in BRAND_DOMAINS.items():
                 if re.search(rf'\b{re.escape(brand)}\b', anchor_text):
-                    if not href_domain.endswith(expected_domain):
+                    if not domain_matches(href_domain, expected_domain):
                         flags.append(f"anchor_brand_mismatch:{brand}(text_claims:{brand},href_domain:{href_domain})")
                     
             # Case B: anchor text itself looks like a URL/domain
@@ -288,6 +290,13 @@ class URLAnalyzer:
         meta["url_count"] = len(urls)
         suspicious_urls = []
 
+        anchor_pairs = _extract_anchor_pairs(body_html)
+        anchor_mismatch_flags = _check_anchor_mismatch(anchor_pairs)
+        meta["anchor_pairs_checked"] = len(anchor_pairs)
+        if anchor_mismatch_flags:
+            flags.extend(anchor_mismatch_flags)
+            score += 25 * len(anchor_mismatch_flags)
+
         domain_cache: dict[str, object] = {}
         for url in urls[:10]:  # cap at 10 to bound latency
             domain = extract_domain(url)
@@ -324,6 +333,9 @@ class URLAnalyzer:
                     f"dnstwist_brand_match:{brand_match.matched_brand}"
                     f"(type:{brand_match.permutation_type})"
                 )
+                if brand_match and is_newly_registered_domain(domain):
+                    score += 35
+                    url_flags.append(f"dnstwist_match_newly_registered:{brand_match.matched_brand}")
 
             # ── URL structure red flags ────────────────────────────────────
             structure_flags = _url_structure_red_flags(url)

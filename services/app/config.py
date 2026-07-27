@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
 
     # ── External APIs ─────────────────────────────────────────────────────────
-    google_safe_browsing_key: Optional[str] = None
+    google_web_risk_key: Optional[str] = None
 
 
 @lru_cache

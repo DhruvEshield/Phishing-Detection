@@ -16,6 +16,7 @@ from app.database import init_db
 from app.scoring.config import ScoringConfig
 from app.api import ingest, queue, verdicts, reports
 from app.detectors.feed_ingestor import start_feed_refresh_thread
+from app.detectors.nrd_feed import start_nrd_refresh_thread
 
 # ── Structured logging setup ──────────────────────────────────────────────────
 settings = get_settings()
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI):
     log.info("startup.db_ready")
     # Start background feed refresh thread (runs every 6 hours)
     start_feed_refresh_thread(interval_seconds=21600)
+    start_nrd_refresh_thread(interval_seconds=86400)
     log.info("startup.feed_refresh_started")
     yield
 

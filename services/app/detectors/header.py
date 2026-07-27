@@ -17,6 +17,7 @@ from app.detectors.domain_intel import (
     normalize_for_homoglyph,
 )
 from app.detectors.brand_intel import check_domain_against_brands
+from app.detectors.nrd_feed import is_newly_registered_domain
 
 log = structlog.get_logger()
 
@@ -213,12 +214,28 @@ class HeaderAnalyzer:
             meta["auth_alignment"] = {"aligned": None, "from_domain": from_reg}
 
         # ── Reply-To mismatch ────────────────────────────────────────────────
+        # Compare organisational domains, not exact hosts: 'support@help.example.com'
+        # replying for 'alice@example.com' is ordinary mail flow, not a mismatch.
         if reply_to:
             reply_domain = extract_domain(reply_to)
-            if reply_domain and reply_domain != sender_domain:
+            if reply_domain and registered_domain(reply_domain) != from_reg:
                 score += self._REPLY_TO_MISMATCH
                 flags.append(f"reply_to_mismatch:{reply_domain}!={sender_domain}")
                 meta["reply_to_domain"] = reply_domain
+
+        # ── Return-Path domain mismatch ─────────────────────────────────
+        # A legitimate sender's bounce address (Return-Path) domain should match
+        # the From domain. A mismatch here is a cross-header inconsistency that
+        # existing checks (which only look at Reply-To, or SPF/DKIM alignment) miss.
+        # Compared at the registered-domain level — ESPs routinely bounce via a
+        # subdomain ('bounce@mailer.example.com'), which is not a mismatch.
+        return_path = headers.get("Return-Path", "")
+        if return_path:
+            return_path_domain = extract_domain(return_path.strip().strip("<>"))
+            if return_path_domain and registered_domain(return_path_domain) != from_reg:
+                score += self._REPLY_TO_MISMATCH
+                flags.append(f"return_path_mismatch:{return_path_domain}!={sender_domain}")
+                meta["return_path_domain"] = return_path_domain
 
         # ── Lookalike display name ───────────────────────────────────────────
         if display_name:
@@ -280,6 +297,10 @@ class HeaderAnalyzer:
                     "permutation_type": brand_match.permutation_type,
                     "matched_domain": brand_match.matched_domain,
                 }
+                if brand_match and is_newly_registered_domain(sender_domain):
+                    score += self._BRAND_IMPERSONATION_MISMATCH
+                    flags.append(f"dnstwist_match_newly_registered:{brand_match.matched_brand}")
+                    meta["dnstwist_match_newly_registered"] = True
 
         # ── Brand impersonation — display name claims brand but sender domain doesn't match ───
         if display_name and sender_domain:
