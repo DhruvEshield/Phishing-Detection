@@ -38,6 +38,20 @@ def registered_domain(domain: str) -> str:
     return domain.strip().lower()
 
 
+def domain_matches(host: str, expected: str) -> bool:
+    """True when *host* is exactly *expected* or a subdomain of it.
+
+    A plain `host.endswith(expected)` is a detection bypass: 'evilamazon.com'
+    ends with 'amazon.com', so a lookalike link would pass a brand check.
+    Require a label boundary — either an exact match or a '.'-prefixed suffix.
+    """
+    if not host or not expected:
+        return False
+    host = host.strip().lower().rstrip(".")
+    expected = expected.strip().lower().rstrip(".")
+    return host == expected or host.endswith(f".{expected}")
+
+
 # Common cross-script confusables used in IDN homograph attacks. NFKD does not
 # map these to Latin (different scripts), so they need an explicit table.
 _CONFUSABLES = {

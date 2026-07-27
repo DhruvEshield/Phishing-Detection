@@ -21,6 +21,7 @@ from app.detectors.domain_intel import (
     extract_domain,
     ssrf_guard,
     normalize_for_homoglyph,
+    domain_matches,
 )
 from app.detectors.brand_intel import check_domain_against_brands
 from app.detectors.nrd_feed import is_newly_registered_domain
@@ -99,7 +100,7 @@ def _check_anchor_mismatch(pairs: list[dict]) -> list[str]:
             # Case A: anchor text names a brand, href doesn't match
             for brand, expected_domain in BRAND_DOMAINS.items():
                 if re.search(rf'\b{re.escape(brand)}\b', anchor_text):
-                    if not href_domain.endswith(expected_domain):
+                    if not domain_matches(href_domain, expected_domain):
                         flags.append(f"anchor_brand_mismatch:{brand}(text_claims:{brand},href_domain:{href_domain})")
                     
             # Case B: anchor text itself looks like a URL/domain
