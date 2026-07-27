@@ -1,7 +1,10 @@
 """Header analyzer unit tests — DNS calls are mocked."""
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from app.detectors.header import HeaderAnalyzer
+from app.detectors.brand_intel import BrandMatch
 from tests.conftest import SAMPLE_HEADERS, CLEAN_HEADERS
 
 
@@ -168,19 +171,49 @@ def test_homoglyph_sender_domain_detected():
         f"Expected homoglyph flag, got: {signal.flags}"
 
 
-def test_return_path_mismatch_detected():
-    """Return-Path domain differing from From domain should be flagged."""
-    headers = {
-        "From": "Alice <alice@legit-company.com>",
-        "Return-Path": "<bounce@evil-domain.com>",
-    }
-    analyzer = HeaderAnalyzer()
-    signal = analyzer.analyse(headers, weight=0.20)
-    assert any("return_path_mismatch" in f for f in signal.flags)
-    assert signal.raw_score > 0
+def _score_delta(extra: dict) -> tuple[float, list[str]]:
+    """Score contributed by *extra* headers over a bare From-only baseline.
 
-from unittest.mock import patch
-from app.detectors.brand_intel import BrandMatch
+    Isolates one check's contribution: a raw total would also carry the
+    spf/dkim/dmarc_missing points these minimal fixtures always incur, so a
+    total-based assertion would break whenever an unrelated check changed.
+    """
+    base_headers = {"From": "Alice <alice@example.com>"}
+    analyzer = HeaderAnalyzer()
+    base = analyzer.analyse(dict(base_headers), weight=0.20)
+    signal = analyzer.analyse({**base_headers, **extra}, weight=0.20)
+    return signal.raw_score - base.raw_score, signal.flags
+
+
+def test_return_path_mismatch_detected():
+    """Return-Path on an unrelated org should be flagged, worth exactly the
+    mismatch weight."""
+    delta, flags = _score_delta({"Return-Path": "<bounce@evil-domain.com>"})
+    assert any("return_path_mismatch" in f for f in flags)
+    assert delta == HeaderAnalyzer._REPLY_TO_MISMATCH
+
+
+def test_return_path_subdomain_not_flagged():
+    """A bounce address on a subdomain of the From domain is normal mail flow.
+    Exact-host comparison flagged it and added 20 points to legitimate mail."""
+    delta, flags = _score_delta({"Return-Path": "<bounce@mailer.example.com>"})
+    assert not any("return_path_mismatch" in f for f in flags), flags
+    assert delta == 0
+
+
+def test_reply_to_subdomain_not_flagged():
+    """Same organisational-domain rule for Reply-To."""
+    delta, flags = _score_delta({"Reply-To": "support@help.example.com"})
+    assert not any("reply_to_mismatch" in f for f in flags), flags
+    assert delta == 0
+
+
+def test_reply_to_different_org_still_flagged():
+    """Guard against over-correcting: a genuinely different org must flag."""
+    delta, flags = _score_delta({"Reply-To": "attacker@evil.com"})
+    assert any("reply_to_mismatch" in f for f in flags)
+    assert delta == HeaderAnalyzer._REPLY_TO_MISMATCH
+
 
 @patch("app.detectors.header.check_domain_against_brands")
 @patch("app.detectors.header.is_newly_registered_domain")
