@@ -8,7 +8,6 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
 
 import httpx
-import pytest
 
 from app.detectors.nrd_feed import _fetch_nrd_feed, refresh_nrd_cache, is_newly_registered_domain
 

@@ -1,5 +1,4 @@
-import pytest
-from app.detectors.url import _extract_anchor_pairs
+from app.detectors.url import _extract_anchor_pairs, _check_anchor_mismatch
 
 def test_extract_simple_anchor():
     html = '<p>Click <a href="https://example.com">here</a> to login.</p>'
@@ -42,8 +41,6 @@ def test_malformed_html():
     html = '<a href="https://bad.com">Unclosed anchor'
     pairs = _extract_anchor_pairs(html)
     assert len(pairs) == 0
-
-from app.detectors.url import _check_anchor_mismatch
 
 def test_anchor_brand_mismatch():
     pairs = [{"href": "https://evil.com/login", "anchor_text": "Login to Amazon now"}]

@@ -1,4 +1,3 @@
-import pytest
 from app.scoring.severity_map import (
     get_flag_severity,
     CRITICAL,

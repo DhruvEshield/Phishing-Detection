@@ -6,7 +6,11 @@ Runs all 5 detectors concurrently via threads, then scores and persists.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
+from email.utils import parseaddr
+
 import structlog
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -27,6 +31,23 @@ from app.models.sender_history import SenderHistory
 from app.scoring.severity_map import get_flag_severity
 
 log = structlog.get_logger()
+
+
+def _canonical_sender(from_header: str) -> str:
+    """Reduce a raw From header to a comparable mailbox address.
+
+    The raw header is not a stable key: 'Alice <alice@example.com>' and
+    'alice@example.com' are the same sender but would create separate history
+    rows, splitting first-seen and counts. Case is normalised too, since
+    mailbox domains are case-insensitive.
+    """
+    if not from_header:
+        return ""
+    _, address = parseaddr(from_header)
+    # parseaddr returns '' for unparseable input — fall back to the raw value
+    # so a malformed header still records *something* rather than silently
+    # dropping the sender.
+    return (address or from_header).strip().lower()
 
 
 def _load_classifier():
@@ -213,32 +234,42 @@ class DetectionService:
         """Upsert a SenderHistory row — tracks first/last seen and count per
         sender. Groundwork for future first-time-sender / BEC detection;
         no detection logic reads this yet."""
-        if not sender:
+        address = _canonical_sender(sender)
+        if not address:
             return
-        from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
         try:
-            existing = (
-                self._db.query(SenderHistory)
-                .filter(
-                    SenderHistory.sender == sender,
-                    SenderHistory.tenant_id == tenant_id,
-                )
-                .first()
+            # Single atomic statement. A SELECT-then-INSERT/increment is a
+            # check-then-write race: concurrent analyses of the same sender
+            # either lose an increment or both INSERT, and the resulting
+            # unique-constraint violation would surface at the caller's
+            # commit() — outside this try — failing the whole email analysis.
+            stmt = pg_insert(SenderHistory).values(
+                sender=address,
+                tenant_id=tenant_id or "",
+                first_seen_at=now,
+                last_seen_at=now,
+                email_count=1,
             )
-            if existing:
-                existing.last_seen_at = now
-                existing.email_count += 1
-            else:
-                self._db.add(SenderHistory(
-                    sender=sender,
-                    tenant_id=tenant_id,
-                    first_seen_at=now,
-                    last_seen_at=now,
-                    email_count=1,
-                ))
+            stmt = stmt.on_conflict_do_update(
+                constraint="uq_sender_tenant",
+                set_={
+                    # first_seen_at deliberately untouched — it must keep the
+                    # value from the original insert.
+                    "last_seen_at": stmt.excluded.last_seen_at,
+                    "email_count": SenderHistory.__table__.c.email_count + 1,
+                },
+            )
+            self._db.execute(stmt)
         except Exception as exc:
-            log.warning("detection.sender_history_error", error=str(exc), sender=sender)
+            # No raw sender (PII) and no exception text — a DB error can carry
+            # SQL and bound parameter values, i.e. the address itself. Log a
+            # classification plus the email_id already on the surrounding
+            # detection.complete record for correlation.
+            log.warning(
+                "detection.sender_history_error",
+                error_type=type(exc).__name__,
+            )
 
     def _build_issues_list(self, signals: list) -> list[dict]:
         """Build a severity-graded issues list from all detector signals,
