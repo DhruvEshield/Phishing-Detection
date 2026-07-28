@@ -27,7 +27,11 @@ class SenderHistory(Base):
         default=lambda: str(uuid.uuid4()),
     )
     sender: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
-    tenant_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # '' is the tenant-less sentinel — see the migration for why this is not
+    # nullable (NULL != NULL would defeat uq_sender_tenant).
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, server_default="", default="",
+    )
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     email_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

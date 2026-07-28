@@ -5,7 +5,7 @@ import httpx
 import pytest
 from unittest.mock import patch, MagicMock
 
-from app.detectors.web_risk import check_url
+from app.detectors.web_risk import check_url, _THREAT_TYPES
 
 
 @pytest.fixture
@@ -28,8 +28,18 @@ def test_clean_url(mock_client_class, mock_settings):
     mock_client.get.return_value = mock_response
 
     result = check_url("http://clean.com")
-    
+
     assert result == {"flagged": False}
+
+    # Assert the outbound request, not just the parsed result — a wrong
+    # endpoint or a dropped threatTypes filter would still return
+    # {"flagged": False} and look like a pass.
+    endpoint, = mock_client.get.call_args.args
+    params = mock_client.get.call_args.kwargs["params"]
+    assert endpoint == "https://webrisk.googleapis.com/v1/uris:search"
+    assert params["uri"] == "http://clean.com"
+    assert params["key"] == "test_api_key_123"
+    assert params["threatTypes"] == _THREAT_TYPES
 
 
 @patch("app.detectors.web_risk.httpx.Client")

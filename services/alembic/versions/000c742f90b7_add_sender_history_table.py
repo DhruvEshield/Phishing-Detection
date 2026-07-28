@@ -23,7 +23,12 @@ def upgrade() -> None:
     op.create_table('sender_history',
     sa.Column('id', sa.UUID(as_uuid=False), nullable=False),
     sa.Column('sender', sa.String(length=512), nullable=False),
-    sa.Column('tenant_id', sa.String(length=128), nullable=True),
+    # NOT NULL with a '' sentinel for tenant-less senders. A nullable column
+    # would defeat uq_sender_tenant — in SQL, NULL != NULL, so every
+    # tenant-less sender could be inserted repeatedly and its counts split
+    # across duplicate rows. It also gives the upsert a single ON CONFLICT
+    # target instead of two code paths.
+    sa.Column('tenant_id', sa.String(length=128), nullable=False, server_default=''),
     sa.Column('first_seen_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('last_seen_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('email_count', sa.Integer(), nullable=False),
