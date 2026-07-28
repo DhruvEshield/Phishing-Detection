@@ -37,6 +37,7 @@ class QueueService:
                 "verdict": ar.verdict,
                 "status": qe.status,
                 "tenant_id": email.tenant_id,
+                "issues": ar.explanation_json.get("issues", []),
             }
             for qe, email, ar in rows
         ]

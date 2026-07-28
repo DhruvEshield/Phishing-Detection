@@ -90,38 +90,92 @@ function renderResult(data) {
   const signals = data.explanation.signals;
   const color = getScoreColor(data.risk_score);
 
-  const signalsHtml = signals.map(signal => {
-    const label = SIGNAL_LABELS[signal.signal_name] || signal.signal_name;
-    const contribution = signal.weighted_contribution.toFixed(1);
-    const barClass = getBarClass(signal.raw_score);
-    const flagsHtml = signal.flags.length > 0
-      ? signal.flags.map(f => `<span class="phishdetect-flag">${f}</span>`).join('')
-      : '<span class="phishdetect-flag" style="color:#999">No flags</span>';
+  const issues = data.explanation.issues || [];
+  const hasMediumOrAbove = issues.some(i => ['Critical', 'High', 'Medium'].includes(i.severity));
+
+  const severityColors = {
+    Critical: '#ea4335',
+    High: '#fb7d3f',
+    Medium: '#fbbc04',
+    Low: '#9aa0a6',
+  };
+
+  const severityRank = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+
+  // Group issues by detector
+  const issuesByDetector = {};
+  for (const issue of issues) {
+    if (!issuesByDetector[issue.detector]) issuesByDetector[issue.detector] = [];
+    issuesByDetector[issue.detector].push(issue);
+  }
+
+  const ALL_DETECTORS = ['header', 'content', 'url', 'qrcode', 'threat_intel', 'attachment'];
+  const detectorsWithIssues = Object.keys(issuesByDetector).sort((a, b) => {
+    const worstA = issuesByDetector[a].reduce((w, i) => severityRank[i.severity] < severityRank[w] ? i.severity : w, issuesByDetector[a][0].severity);
+    const worstB = issuesByDetector[b].reduce((w, i) => severityRank[i.severity] < severityRank[w] ? i.severity : w, issuesByDetector[b][0].severity);
+    return severityRank[worstA] - severityRank[worstB];
+  });
+  const detectorsWithoutIssues = ALL_DETECTORS.filter(d => !issuesByDetector[d]);
+  const detectorsSorted = [...detectorsWithIssues, ...detectorsWithoutIssues];
+
+  const signalsHtml = detectorsSorted.map(detectorName => {
+    const detectorIssues = issuesByDetector[detectorName];
+    const label = SIGNAL_LABELS[detectorName] || detectorName;
+
+    if (!detectorIssues) {
+      return `
+        <div class="phishdetect-signal">
+          <div class="phishdetect-signal-header">
+            <span class="phishdetect-signal-name">${label}</span>
+          </div>
+          <div class="phishdetect-no-issues">No issues found</div>
+        </div>
+      `;
+    }
+
+    const worst = detectorIssues.reduce((w, i) => severityRank[i.severity] < severityRank[w] ? i.severity : w, detectorIssues[0].severity);
+    const issuesHtml = detectorIssues.map(issue => {
+      const match = issue.flag.match(/^([a-zA-Z_]+)/);
+      const keyword = match ? match[1].replace(/_/g, ' ') : issue.flag;
+      return `
+        <div class="phishdetect-issue-row">
+          <span class="phishdetect-keyword-tag" style="border-color:${severityColors[issue.severity]};color:${severityColors[issue.severity]}">${keyword}</span>
+          <span class="phishdetect-issue-desc">${issue.description}</span>
+        </div>
+      `;
+    }).join('');
 
     return `
       <div class="phishdetect-signal">
         <div class="phishdetect-signal-header">
           <span class="phishdetect-signal-name">${label}</span>
-          <span class="phishdetect-signal-score">${contribution} pts</span>
+          <span class="phishdetect-grade-badge" style="background:${severityColors[worst]}">${worst}</span>
         </div>
-        <div class="phishdetect-signal-bar">
-          <div class="phishdetect-signal-bar-fill ${barClass}" style="width:${Math.min(signal.raw_score, 100)}%"></div>
-        </div>
-        <div class="phishdetect-flags">${flagsHtml}</div>
+        ${issuesHtml}
       </div>
     `;
   }).join('');
 
+  // Extract a short keyword from a flag string (text before the first ':' or '(')
+  function flagToKeyword(flag) {
+    const match = flag.match(/^([a-zA-Z_]+)/);
+    if (!match) return flag;
+    return match[1].replace(/_/g, ' ');
+  }
+
+  const keywordTagsHtml = issues.map(issue => {
+    const issueColor = severityColors[issue.severity] || '#9aa0a6';
+    return `<span class="phishdetect-keyword-tag" style="border-color:${issueColor};color:${issueColor}">${flagToKeyword(issue.flag)}</span>`;
+  }).join('');
+
+  const bannerHtml = hasMediumOrAbove
+    ? `<div id="phishdetect-worth-checking">⚠️ This email is worth checking</div>`
+    : '';
+
   document.getElementById('phishdetect-loading').outerHTML = `
     <div id="phishdetect-summary">
-      <div id="phishdetect-score-row">
-        <div id="phishdetect-score">${score} <span>/ 100</span></div>
-        <div class="phishdetect-badge ${tier}">${tier}</div>
-      </div>
-      <div id="phishdetect-progress">
-        <div id="phishdetect-progress-bar" style="width:${score}%;background:${color}"></div>
-      </div>
-      <div id="phishdetect-verdict">Verdict: <strong>${verdict}</strong> → ${data.routing_decision}</div>
+      ${bannerHtml}
+      <div id="phishdetect-keywords">${keywordTagsHtml || '<span style="color:#999">No issues found</span>'}</div>
       <button id="phishdetect-toggle-btn">View Full Analysis ▼</button>
     </div>
     <div id="phishdetect-details">

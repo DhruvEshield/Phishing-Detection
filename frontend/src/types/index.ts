@@ -9,8 +9,16 @@ export interface SignalBreakdown {
   metadata: Record<string, unknown>;
 }
 
+export interface Issue {
+  detector: string;
+  flag: string;
+  description: string;
+  severity: 'Critical' | 'High' | 'Medium' | 'Low';
+}
+
 export interface ScoreExplanation {
   signals: SignalBreakdown[];
+  issues: Issue[];
   model_version: string;
 }
 
@@ -28,6 +36,7 @@ export interface EmailSummary {
   risk_score: number;
   risk_tier: RiskTier;
   verdict: Verdict;
+  issues: Issue[];
   status: QueueStatus;
   tenant_id: string | null;
 }

@@ -5,7 +5,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'ANALYSE_EMAIL') {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
-    fetch('https://prospects-tip-expressed-cds.trycloudflare.com/api/v1/emails/ingest', {
+    fetch('http://localhost:8000/api/v1/emails/ingest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(message.payload),
