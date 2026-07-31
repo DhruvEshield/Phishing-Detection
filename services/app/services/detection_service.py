@@ -28,7 +28,7 @@ from app.models.email import Email
 from app.models.analysis import AnalysisResult
 from app.models.queue_entry import QueueEntry
 from app.models.sender_history import SenderHistory
-from app.scoring.severity_map import get_flag_severity
+from app.scoring.severity_map import get_flag_severity, describe_flag
 
 log = structlog.get_logger()
 
@@ -286,6 +286,7 @@ class DetectionService:
                     "detector": signal.name,
                     "flag": flag,
                     "severity": severity,
+                    "description": describe_flag(flag),
                 })
         issues.sort(key=lambda i: _SEVERITY_ORDER.get(i["severity"], 99))
         return issues

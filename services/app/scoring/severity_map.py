@@ -110,3 +110,64 @@ def get_flag_severity(flag: str) -> str | None:
         return None
         
     return SEVERITY_MAP.get(prefix)
+
+def describe_flag(flag: str) -> str:
+    """Generate a human-readable description for a flag."""
+    if flag.startswith("brand_impersonation:"):
+        m = re.match(r"brand_impersonation:([^()]+)\(sender:([^,]+),expected:([^)]+)\)", flag)
+        if m:
+            return f"Claims to be {m.group(1)}, but the sender domain is {m.group(2)} instead of the expected {m.group(3)}."
+            
+    if flag.startswith("homoglyph_sender_domain:"):
+        m = re.match(r"homoglyph_sender_domain:(.+)~=(.+)", flag)
+        if m:
+            return f"Sender domain {m.group(1)} uses look-alike characters to impersonate {m.group(2)}."
+            
+    if flag.startswith("dnstwist_brand_match:"):
+        m = re.match(r"dnstwist_brand_match:([^()]+)\(type:([^)]+)\)", flag)
+        if m:
+            return f"Sender domain is a {m.group(2)}-style look-alike of {m.group(1)}, detected via automated domain analysis."
+            
+    if flag.startswith("dnstwist_match_newly_registered:"):
+        brand = flag.split(":", 1)[1]
+        return f"Sender domain is a look-alike of {brand} AND was registered very recently — a strong combined signal of a fresh phishing setup."
+        
+    if flag.startswith("auth_pass_but_unaligned:"):
+        m = re.match(r"auth_pass_but_unaligned:(.+)!=(.+)", flag)
+        if m:
+            return f"Email authentication (SPF/DKIM) passed, but for a different domain ({m.group(1)}) than the sender's claimed domain ({m.group(2)}) — a spoofing technique that basic checks miss."
+            
+    if flag.startswith("lookalike_sender_domain:"):
+        m = re.match(r"lookalike_sender_domain:([^~]+)~=([^()]+)", flag)
+        if m:
+            return f"Sender domain {m.group(1)} closely resembles {m.group(2)}."
+            
+    if flag.startswith("exact_brand_display:"):
+        m = re.match(r"exact_brand_display:(.+)==(.+)", flag)
+        if m:
+            return f"Display name exactly matches the brand '{m.group(2)}', but this alone doesn't confirm the sender is legitimate."
+            
+    if flag.startswith("reply_to_mismatch:"):
+        m = re.match(r"reply_to_mismatch:(.+)!=(.+)", flag)
+        if m:
+            return f"Reply-To address ({m.group(1)}) differs from the sender's domain ({m.group(2)})."
+            
+    if flag.startswith("return_path_mismatch:"):
+        m = re.match(r"return_path_mismatch:(.+)!=(.+)", flag)
+        if m:
+            return f"Return-Path (bounce address) domain ({m.group(1)}) differs from the sender's domain ({m.group(2)})."
+            
+    if flag.startswith("lookalike_display:"):
+        m = re.match(r"lookalike_display:([^~]+)~=([^()]+)", flag)
+        if m:
+            return f"Display name '{m.group(1)}' closely resembles the brand '{m.group(2)}'."
+            
+    if flag in ("spf_fail", "dkim_fail", "dmarc_fail"):
+        auth_type = flag.split("_")[0].upper()
+        return f"{auth_type} authentication explicitly failed — a strong indicator the sender's domain isn't genuine."
+        
+    if flag in ("spf_missing", "dkim_missing", "dmarc_missing", "spf_none", "dkim_none", "dmarc_none", "spf_softfail", "spf_neutral"):
+        auth_type = flag.split("_")[0].upper()
+        return f"{auth_type} authentication is missing or inconclusive — weak on its own, but worth noting."
+
+    return flag

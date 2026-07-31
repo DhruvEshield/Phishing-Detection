@@ -20,11 +20,30 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Divider from '@mui/material/Divider';
 import Chip from '@mui/material/Chip';
-import SignalBreakdownCard from '../components/SignalBreakdownCard';
+import ExplanationPanel from '../components/ExplanationPanel';
 import { listQueue, ingestEml } from '../lib/api';
 import type { EmailSummary, EmailDetail } from '../types';
 
 const PAGE_SIZE = 20;
+
+function groupIssuesByDetector(issues: { detector: string; flag: string; severity: string }[]): { detector: string; severity: string }[] {
+  const severityRank: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+  const grouped: Record<string, string> = {};
+  for (const issue of issues) {
+    const current = grouped[issue.detector];
+    if (!current || severityRank[issue.severity] < severityRank[current]) {
+      grouped[issue.detector] = issue.severity;
+    }
+  }
+  return Object.entries(grouped).map(([detector, severity]) => ({ detector, severity }));
+}
+
+const severityLabelColors: Record<string, string> = {
+  Critical: '#c5221f',
+  High: '#ea4335',
+  Medium: '#b06000',
+  Low: '#5f6368',
+};
 
 export default function QueuePage() {
   const navigate = useNavigate();
@@ -129,15 +148,14 @@ export default function QueuePage() {
                   <TableCell><strong>Sender</strong></TableCell>
                   <TableCell><strong>Subject</strong></TableCell>
                   <TableCell><strong>Received</strong></TableCell>
-                  <TableCell align="center"><strong>Score</strong></TableCell>
-                  <TableCell align="center"><strong>Risk</strong></TableCell>
+                  <TableCell><strong>Detected Issues</strong></TableCell>
                   <TableCell align="center"><strong>Status</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                       <Typography color="text.secondary">Queue is empty</Typography>
                     </TableCell>
                   </TableRow>
@@ -156,11 +174,30 @@ export default function QueuePage() {
                       <TableCell>
                         {new Date(email.received_at).toLocaleString()}
                       </TableCell>
-                      <TableCell align="center">
-                        <strong>{email.risk_score.toFixed(1)}</strong>
-                      </TableCell>
-                      <TableCell align="center">
-                        <RiskBadge tier={email.risk_tier} />
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {groupIssuesByDetector(email.issues || []).map(({ detector, severity }) => (
+                            <Typography
+                              key={detector}
+                              component="span"
+                              variant="caption"
+                              sx={{
+                                color: severityLabelColors[severity] || '#5f6368',
+                                fontWeight: 600,
+                                border: '1px solid',
+                                borderColor: severityLabelColors[severity] || '#5f6368',
+                                borderRadius: 1,
+                                px: 0.75,
+                                py: 0.25,
+                              }}
+                            >
+                              {detector}: {severity}
+                            </Typography>
+                          ))}
+                          {(!email.issues || email.issues.length === 0) && (
+                            <Typography variant="caption" color="text.secondary">No issues</Typography>
+                          )}
+                        </Box>
                       </TableCell>
                       <TableCell align="center">
                         <Typography
@@ -204,20 +241,6 @@ export default function QueuePage() {
             <DialogTitle>
               <Box display="flex" justifyContent="space-between" alignItems="center">
                 <Typography variant="h6">Analysis Result</Typography>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Typography variant="h5" fontWeight={700}>
-                    {uploadedResult.risk_score.toFixed(1)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">/100</Typography>
-                  <Chip
-                    label={uploadedResult.risk_tier}
-                    color={
-                      uploadedResult.risk_tier === 'HIGH' ? 'error' :
-                      uploadedResult.risk_tier === 'MEDIUM' ? 'warning' : 'success'
-                    }
-                    size="small"
-                  />
-                </Box>
               </Box>
               <Typography variant="body2" color="text.secondary" mt={0.5}>
                 {uploadedResult.sender}
@@ -231,10 +254,10 @@ export default function QueuePage() {
             </DialogTitle>
             <Divider />
             <DialogContent>
-              <Typography variant="subtitle2" gutterBottom>Signal Breakdown</Typography>
-              {uploadedResult.explanation.signals.map((signal) => (
-                <SignalBreakdownCard key={signal.signal_name} signal={signal} />
-              ))}
+              <ExplanationPanel
+                explanation={uploadedResult.explanation}
+                totalScore={uploadedResult.risk_score}
+              />
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setUploadedResult(null)}>Close</Button>
