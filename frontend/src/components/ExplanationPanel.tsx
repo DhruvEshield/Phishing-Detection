@@ -38,9 +38,9 @@ function getDetectorGrade(detectorIssues: Issue[]): Issue['severity'] | null {
   );
 }
 
-interface Props { explanation: ScoreExplanation; totalScore: number }
+interface Props { explanation: ScoreExplanation }
 
-export default function ExplanationPanel({ explanation, totalScore }: Props) {
+export default function ExplanationPanel({ explanation }: Props) {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>

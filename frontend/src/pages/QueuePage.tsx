@@ -12,14 +12,12 @@ import Paper from '@mui/material/Paper';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import Pagination from '@mui/material/Pagination';
-import RiskBadge from '../components/RiskBadge';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Divider from '@mui/material/Divider';
-import Chip from '@mui/material/Chip';
 import ExplanationPanel from '../components/ExplanationPanel';
 import { listQueue, ingestEml } from '../lib/api';
 import type { EmailSummary, EmailDetail } from '../types';
@@ -256,7 +254,6 @@ export default function QueuePage() {
             <DialogContent>
               <ExplanationPanel
                 explanation={uploadedResult.explanation}
-                totalScore={uploadedResult.risk_score}
               />
             </DialogContent>
             <DialogActions>

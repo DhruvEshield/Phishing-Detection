@@ -127,7 +127,6 @@ export default function DetailPage() {
             <CardContent>
               <ExplanationPanel
                 explanation={email.explanation}
-                totalScore={email.risk_score}
               />
             </CardContent>
           </Card>
