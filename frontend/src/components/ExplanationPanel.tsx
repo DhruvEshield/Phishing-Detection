@@ -3,6 +3,7 @@ import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
 import Chip from '@mui/material/Chip';
 import type { ScoreExplanation, Issue } from '../types';
+import { getIssuesForDetector, getDetectorGrade } from '../lib/severity';
 
 const severityColors: Record<Issue['severity'], 'error' | 'warning' | 'default'> = {
   Critical: 'error',
@@ -26,17 +27,6 @@ const DETECTOR_LABELS: Record<string, string> = {
   threat_intel: 'Threat Intelligence',
   attachment: 'Attachment Analysis',
 };
-function getIssuesForDetector(detector: string, issues: Issue[]): Issue[] {
-  return issues.filter(i => i.detector === detector);
-}
-function getDetectorGrade(detectorIssues: Issue[]): Issue['severity'] | null {
-  const severityRank: Record<Issue['severity'], number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-  if (detectorIssues.length === 0) return null;
-  return detectorIssues.reduce((worst, issue) =>
-    severityRank[issue.severity] < severityRank[worst] ? issue.severity : worst,
-    detectorIssues[0].severity
-  );
-}
 
 interface Props { explanation: ScoreExplanation }
 

@@ -21,20 +21,10 @@ import Divider from '@mui/material/Divider';
 import ExplanationPanel from '../components/ExplanationPanel';
 import { listQueue, ingestEml } from '../lib/api';
 import type { EmailSummary, EmailDetail } from '../types';
+import { groupIssuesByDetector } from '../lib/severity';
 
 const PAGE_SIZE = 20;
 
-function groupIssuesByDetector(issues: { detector: string; flag: string; severity: string }[]): { detector: string; severity: string }[] {
-  const severityRank: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-  const grouped: Record<string, string> = {};
-  for (const issue of issues) {
-    const current = grouped[issue.detector];
-    if (!current || severityRank[issue.severity] < severityRank[current]) {
-      grouped[issue.detector] = issue.severity;
-    }
-  }
-  return Object.entries(grouped).map(([detector, severity]) => ({ detector, severity }));
-}
 
 const severityLabelColors: Record<string, string> = {
   Critical: '#c5221f',
