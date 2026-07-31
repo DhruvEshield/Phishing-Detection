@@ -1,4 +1,3 @@
-import pytest
 from app.scoring.severity_map import describe_flag
 
 def test_describe_flag_brand_impersonation():
