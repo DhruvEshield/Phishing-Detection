@@ -80,14 +80,28 @@ SEVERITY_MAP: dict[str, str] = {
 _PREFIX_REGEX = re.compile(r"^([a-zA-Z_]+)")
 _ML_CONF_REGEX = re.compile(r"ml_phishing\(conf=([0-9.]+)\)")
 
+_QR_PREFIX = "qr>"
+
+
+def _strip_qr_prefix(flag: str) -> str:
+    """QRCodeDetector re-emits the URL analyzer's flags prefixed with 'qr>'.
+    Every consumer of a flag string has to unwrap that before matching.
+
+    Shared deliberately: this used to be inlined in get_flag_severity only,
+    so describe_flag silently fell through to its raw-flag fallback for every
+    QR-embedded URL — graded correctly, but shown to the analyst as
+    'qr>brand_impersonation:paypal(...)'.
+    """
+    return flag[len(_QR_PREFIX):] if flag.startswith(_QR_PREFIX) else flag
+
+
 def get_flag_severity(flag: str) -> str | None:
     """
     Extract the stable prefix from a flag string and return its severity level.
     Returns None for excluded flags or unmapped flags.
     """
-    if flag.startswith("qr>"):
-        flag = flag[3:]
-        
+    flag = _strip_qr_prefix(flag)
+
     if flag.startswith("ml_phishing"):
         match = _ML_CONF_REGEX.search(flag)
         if match:
@@ -113,6 +127,11 @@ def get_flag_severity(flag: str) -> str | None:
 
 def describe_flag(flag: str) -> str:
     """Generate a human-readable description for a flag."""
+    # Match on the unwrapped flag, but fall back to the *original* so an
+    # unmapped QR flag keeps its 'qr>' provenance in the analyst-facing text.
+    original = flag
+    flag = _strip_qr_prefix(flag)
+
     if flag.startswith("brand_impersonation:"):
         m = re.match(r"brand_impersonation:([^()]+)\(sender:([^,]+),expected:([^)]+)\)", flag)
         if m:
@@ -170,4 +189,4 @@ def describe_flag(flag: str) -> str:
         auth_type = flag.split("_")[0].upper()
         return f"{auth_type} authentication is missing or inconclusive — weak on its own, but worth noting."
 
-    return flag
+    return original

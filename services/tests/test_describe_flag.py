@@ -1,4 +1,3 @@
-import pytest
 from app.scoring.severity_map import describe_flag
 
 def test_describe_flag_brand_impersonation():
@@ -68,3 +67,30 @@ def test_describe_flag_inconclusive():
 def test_describe_flag_fallback():
     flag = "unknown_detector_flag:some_data(123)"
     assert describe_flag(flag) == flag
+
+
+def test_describe_flag_strips_qr_prefix():
+    """QR-embedded URLs reuse the URL analyzer's flags with a 'qr>' prefix
+    (see QRCodeDetector). get_flag_severity strips it before matching, so
+    describe_flag must too — otherwise a quishing email is graded correctly
+    but described to the analyst as a raw flag string."""
+    assert describe_flag("qr>brand_impersonation:paypal(sender:evil.com,expected:paypal.com)") == (
+        "Claims to be paypal, but the sender domain is evil.com "
+        "instead of the expected paypal.com."
+    )
+
+
+def test_describe_flag_strips_qr_prefix_for_all_formats():
+    """The prefix, not one lucky format — a second shape must work too."""
+    assert describe_flag("qr>lookalike_sender_domain:paypa1.com~=paypal.com") == (
+        "Sender domain paypa1.com closely resembles paypal.com."
+    )
+    assert describe_flag("qr>spf_fail") == (
+        "SPF authentication explicitly failed — a strong indicator "
+        "the sender's domain isn't genuine."
+    )
+
+
+def test_describe_flag_qr_prefix_unmapped_falls_back_to_raw():
+    """An unmapped qr> flag still falls through to the raw-flag fallback."""
+    assert describe_flag("qr>unknown_flag:data") == "qr>unknown_flag:data"

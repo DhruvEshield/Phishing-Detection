@@ -12,31 +12,19 @@ import Paper from '@mui/material/Paper';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import Pagination from '@mui/material/Pagination';
-import RiskBadge from '../components/RiskBadge';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Divider from '@mui/material/Divider';
-import Chip from '@mui/material/Chip';
 import ExplanationPanel from '../components/ExplanationPanel';
 import { listQueue, ingestEml } from '../lib/api';
 import type { EmailSummary, EmailDetail } from '../types';
+import { groupIssuesByDetector } from '../lib/severity';
 
 const PAGE_SIZE = 20;
 
-function groupIssuesByDetector(issues: { detector: string; flag: string; severity: string }[]): { detector: string; severity: string }[] {
-  const severityRank: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-  const grouped: Record<string, string> = {};
-  for (const issue of issues) {
-    const current = grouped[issue.detector];
-    if (!current || severityRank[issue.severity] < severityRank[current]) {
-      grouped[issue.detector] = issue.severity;
-    }
-  }
-  return Object.entries(grouped).map(([detector, severity]) => ({ detector, severity }));
-}
 
 const severityLabelColors: Record<string, string> = {
   Critical: '#c5221f',
@@ -256,7 +244,6 @@ export default function QueuePage() {
             <DialogContent>
               <ExplanationPanel
                 explanation={uploadedResult.explanation}
-                totalScore={uploadedResult.risk_score}
               />
             </DialogContent>
             <DialogActions>
